@@ -126,7 +126,7 @@ graph TD
 
 1. **克隆项目**
    ```bash
-   git clone https://gitee.com/your-username/sensitive-detector.git
+   git clone https://gitee.com/saisai5203/sensitive-detector.git
    cd sensitive-detector
    ```
 
@@ -338,7 +338,7 @@ services:
 **一键部署**:
 ```bash
 # 1. 下载 Gitee 部署脚本
-wget https://gitee.com/saisai5203/sensitive-detector/scripts/gitee-deploy.sh
+wget https://gitee.com/saisai5203/sensitive-detector-v1.0.0/raw/master/scripts/gitee-deploy.sh
 
 # 2. 执行部署
 chmod +x gitee-deploy.sh

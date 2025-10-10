@@ -41,7 +41,6 @@ show_welcome() {
     echo "=========================================="
     echo ""
     echo "本脚本将帮助您从 Gitee 快速部署敏感词检测系统"
-    echo "适用于国内网络环境"
     echo ""
 }
 
@@ -106,7 +105,7 @@ EOF
 download_package() {
     log_step "下载部署包..."
     
-    PACKAGE_URL="${GITEE_URL}/releases/download/v${VERSION}/${PACKAGE_NAME}.tar.gz"
+    PACKAGE_URL="${GITEE_URL}/releases/${PACKAGE_NAME}.tar.gz"
     
     log_info "下载地址: ${PACKAGE_URL}"
     
