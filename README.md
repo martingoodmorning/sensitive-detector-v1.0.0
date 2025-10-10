@@ -126,7 +126,7 @@ graph TD
 
 1. **克隆项目**
    ```bash
-   git clone https://gitee.com/saisai5203/sensitive-detector.git
+   git clone https://gitee.com/saisai5203/sensitive-detector-v1.0.0.git
    cd sensitive-detector
    ```
 
