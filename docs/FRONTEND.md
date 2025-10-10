@@ -718,4 +718,4 @@ document.addEventListener('DOMContentLoaded', function() {
 ---
 
 **文档版本**: v1.0.0  
-**最后更新**: 2024年1月1日
+**最后更新**: 2025年10月

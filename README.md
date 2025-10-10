@@ -2,6 +2,8 @@
 
 一个基于 FastAPI + Ollama 的智能敏感词检测系统，支持文本和文档检测，具备规则匹配和大语言模型双重检测能力。
 
+项目已上传 https://gitee.com/saisai5203/sensitive-detector-v1.0.0.git
+
 ## 📋 目录
 
 - [项目概述](#项目概述)
@@ -12,6 +14,7 @@
 - [前端界面](#前端界面)
 - [配置说明](#配置说明)
 - [部署指南](#部署指南)
+- [Docker 配置指南](#docker-配置指南)
 - [开发指南](#开发指南)
 - [故障排除](#故障排除)
 
@@ -24,7 +27,7 @@
 - **双重检测**：规则匹配 + LLM 智能检测
 - **多格式支持**：文本、PDF、DOCX 文档
 - **实时检测**：毫秒级响应时间
-- **现代化界面**：简洁美观的 Web 界面
+- **Web界面**：简洁美观的 Web 界面
 - **容器化部署**：Docker 一键部署
 
 ## 🏗️ 技术架构
@@ -86,6 +89,7 @@
 2. **文档检测**
    - 支持 TXT、PDF、DOCX 格式
    - 文件大小限制（10MB）
+   - 字符限制（10000个字符）
    - 拖拽上传支持
 
 3. **智能检测**
@@ -332,6 +336,15 @@ services:
 ```
 
 ## 🚢 部署指南
+
+### Docker Compose 配置选择
+
+本项目提供两个 Docker Compose 配置文件：
+
+- **docker-compose.yml**: 开发环境配置，依赖外部 Ollama 服务
+- **docker-compose.prod.yml**: 生产环境配置，包含完整的 Ollama 服务
+
+详细配置说明请参考 [Docker 配置指南](docs/DOCKER_COMPOSE_GUIDE.md)。
 
 ### 快速部署 (推荐)
 
@@ -619,27 +632,16 @@ curl -X POST http://localhost:11434/api/generate \
    - 防火墙设置
    - 定期安全更新
 
-## 📞 技术支持
 
 ### 联系方式
 
-- **项目维护者**: [维护者姓名]
-- **邮箱**: [维护者邮箱]
-- **Gitee**: https://gitee.com/saisai5203/sensitive-detector
+- **项目维护者**: [xxx]
+- **邮箱**: [xxx]
+- **Gitee**: https://gitee.com/saisai5203/sensitive-detector-v1.0.0
 
 ### 贡献指南
 
-1. Fork 项目仓库
-2. 创建功能分支
-3. 提交代码更改
-4. 创建 Pull Request
-5. 等待代码审查
 
-### 许可证
 
-本项目采用 MIT 许可证，详情请参阅 [LICENSE](LICENSE) 文件。
-
----
-
-**最后更新**: 2025年1月
+**最后更新**: 2025年10月
 **版本**: v1.0.0

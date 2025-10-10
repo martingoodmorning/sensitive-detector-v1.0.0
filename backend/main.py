@@ -94,7 +94,7 @@ def call_ollama_api(text: str) -> str:
     # Ollama API 地址与模型名通过环境变量配置
     # 在WSL环境中，使用host.docker.internal可能无法解析，尝试多种方式
     base_url = os.getenv("OLLAMA_BASE_URL", "http://172.17.0.1:11434").rstrip("/")
-    model_name = os.getenv("OLLAMA_MODEL", "qwen:1.8b")
+    model_name = os.getenv("OLLAMA_MODEL", "qwen:7b")
     ollama_url = f"{base_url}/api/generate"
     
     print(f"尝试调用Ollama API: {ollama_url}")
@@ -249,6 +249,17 @@ async def detect_document(file: UploadFile = File(...)):
             "llm_detected": llm_result,
             "final_result": final_result
         }
+    }
+
+# ---------------------- 健康检查端点 ----------------------
+@app.get("/health")
+async def health_check():
+    """健康检查端点"""
+    import time
+    return {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "version": "1.0.0"
     }
 
 # ---------------------- 启动入口（供容器内执行） ----------------------
