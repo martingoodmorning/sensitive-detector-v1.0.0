@@ -401,7 +401,7 @@ echo "部署包创建完成: ${PACKAGE_NAME}.tar.gz"
 **用户部署流程**:
 ```bash
 # 1. 下载部署包
-wget https://gitee.com/your-username/sensitive-detector/releases/download/v1.0.0/sensitive-detector-v1.0.0.tar.gz
+wget https://gitee.com/saisai5203/sensitive-detector/releases/download/v1.0.0/sensitive-detector-v1.0.0.tar.gz
 
 # 2. 解压部署包
 tar -xzf sensitive-detector-v1.0.0.tar.gz
@@ -710,7 +710,7 @@ docker compose logs --tail=20 sensitive-detector-backend
 ### 常见问题
 - 查看 [故障排除文档](TROUBLESHOOTING.md)
 - 查看 [FAQ 文档](FAQ.md)
-- 提交 [Gitee Issue](https://gitee.com/your-username/sensitive-detector/issues)
+- 提交 [Gitee Issue](https://gitee.com/saisai5203/sensitive-detector/issues)
 
 ---
 

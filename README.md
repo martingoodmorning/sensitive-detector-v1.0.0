@@ -126,7 +126,7 @@ graph TD
 
 1. **克隆项目**
    ```bash
-   git clone <repository-url>
+   git clone https://gitee.com/your-username/sensitive-detector.git
    cd sensitive-detector
    ```
 
@@ -202,7 +202,7 @@ graph TD
   "data": {
     "filename": "document.pdf",
     "file_type": "pdf",
-    "text_length": 1500,
+    "text_length": 10000,
     "rule_detected": [],
     "llm_detected": "正常",
     "final_result": "正常"
@@ -218,7 +218,7 @@ graph TD
 ```json
 {
   "status": "healthy",
-  "timestamp": "2024-01-01T00:00:00Z"
+  "timestamp": "2025-01-01T00:00:00Z"
 }
 ```
 
@@ -337,14 +337,12 @@ services:
 
 **一键部署**:
 ```bash
-# 1. 下载部署包
-wget https://gitee.com/your-username/sensitive-detector/releases/download/v1.0.0/sensitive-detector-v1.0.0.tar.gz
+# 1. 下载 Gitee 部署脚本
+wget https://gitee.com/saisai5203/sensitive-detector/scripts/gitee-deploy.sh
 
-# 2. 解压并安装
-tar -xzf sensitive-detector-v1.0.0.tar.gz
-cd sensitive-detector-v1.0.0
-chmod +x install.sh
-./install.sh
+# 2. 执行部署
+chmod +x gitee-deploy.sh
+./gitee-deploy.sh
 
 # 3. 访问系统
 # 浏览器打开: http://localhost:8000
@@ -627,7 +625,7 @@ curl -X POST http://localhost:11434/api/generate \
 
 - **项目维护者**: [维护者姓名]
 - **邮箱**: [维护者邮箱]
-- **Gitee**: [项目仓库地址]
+- **Gitee**: https://gitee.com/saisai5203/sensitive-detector
 
 ### 贡献指南
 

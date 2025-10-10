@@ -27,7 +27,7 @@ log_step() {
 }
 
 # 配置变量
-GITEE_USERNAME="your-username"
+GITEE_USERNAME="saisai5203"
 REPO_NAME="sensitive-detector"
 VERSION="1.0.0"
 PACKAGE_NAME="sensitive-detector-v${VERSION}"

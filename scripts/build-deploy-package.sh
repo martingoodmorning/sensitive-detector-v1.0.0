@@ -91,6 +91,20 @@ chmod +x install.sh
 # 浏览器打开: http://localhost:8000
 ```
 
+## Gitee 部署（推荐）
+
+```bash
+# 1. 下载 Gitee 部署脚本
+wget https://gitee.com/saisai5203/sensitive-detector/raw/main/scripts/gitee-deploy.sh
+
+# 2. 执行部署
+chmod +x gitee-deploy.sh
+./gitee-deploy.sh
+
+# 3. 访问系统
+# 浏览器打开: http://localhost:8000
+```
+
 ## 手动安装
 
 ```bash
@@ -127,7 +141,8 @@ docker compose ps
 如果遇到问题，请查看：
 - [故障排除文档](docs/TROUBLESHOOTING.md)
 - [API 文档](docs/API.md)
-- [部署指南](docs/DEPLOYMENT.md)
+- [Docker 部署指南](docs/DOCKER_DEPLOYMENT.md)
+- [Gitee 部署指南](docs/GITEE_DEPLOYMENT.md)
 EOF
 
     # 创建版本信息文件

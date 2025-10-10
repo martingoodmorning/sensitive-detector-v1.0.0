@@ -10,7 +10,7 @@
 
 ```bash
 # 1. 下载部署包
-wget https://gitee.com/your-username/sensitive-detector/releases/download/v1.0.0/sensitive-detector-v1.0.0.tar.gz
+wget https://gitee.com/saisai5203/sensitive-detector/releases/download/v1.0.0/sensitive-detector-v1.0.0.tar.gz
 
 # 2. 解压并安装
 tar -xzf sensitive-detector-v1.0.0.tar.gz
@@ -26,7 +26,7 @@ chmod +x install.sh
 
 ```bash
 # 1. 克隆项目
-git clone https://gitee.com/your-username/sensitive-detector.git
+git clone https://gitee.com/saisai5203/sensitive-detector.git
 cd sensitive-detector
 
 # 2. 构建部署包
@@ -275,14 +275,14 @@ curl -I https://ollama.ai
 ## 📞 技术支持
 
 ### 联系方式
-- **Gitee 仓库**: https://gitee.com/your-username/sensitive-detector
-- **Issues**: https://gitee.com/your-username/sensitive-detector/issues
+- **Gitee 仓库**: https://gitee.com/saisai5203/sensitive-detector
+- **Issues**: https://gitee.com/saisai5203/sensitive-detector/issues
 - **邮箱**: support@example.com
 
 ### 获取帮助
 1. 查看 [故障排除文档](TROUBLESHOOTING.md)
 2. 查看 [FAQ 文档](FAQ.md)
-3. 提交 [Gitee Issue](https://gitee.com/your-username/sensitive-detector/issues)
+3. 提交 [Gitee Issue](https://gitee.com/saisai5203/sensitive-detector/issues)
 4. 发送邮件到技术支持邮箱
 
 ## 🔄 更新和维护
@@ -290,7 +290,7 @@ curl -I https://ollama.ai
 ### 版本更新
 ```bash
 # 1. 下载新版本
-wget https://gitee.com/your-username/sensitive-detector/releases/download/v1.1.0/sensitive-detector-v1.1.0.tar.gz
+wget https://gitee.com/saisai5203/sensitive-detector/releases/download/v1.1.0/sensitive-detector-v1.1.0.tar.gz
 
 # 2. 备份当前版本
 cp -r sensitive-detector-v1.0.0 sensitive-detector-v1.0.0.backup
