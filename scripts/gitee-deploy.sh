@@ -135,7 +135,7 @@ extract_package() {
     log_step "解压部署包..."
     
     if [ -f "${PACKAGE_NAME}.tar.gz" ]; then
-        tar -xzf "${PACKAGE_NAME}.tar.gz"
+        tar -zxvf "${PACKAGE_NAME}.tar.gz"
         log_info "解压完成"
     else
         log_error "部署包文件不存在"

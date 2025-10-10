@@ -129,7 +129,7 @@ setup_sensitive_words() {
     
     if [ ! -f config/sensitive_words.txt ]; then
         log_info "创建默认敏感词库..."
-        cp config.example/sensitive_words.txt config/sensitive_words.txt
+        cp examples/config.example/sensitive_words.txt config/sensitive_words.txt
         log_info "默认敏感词库创建完成"
     else
         log_info "使用现有敏感词库"
@@ -143,19 +143,19 @@ setup_sensitive_words() {
 deploy_app() {
     log_step "部署敏感词检测系统..."
     
-    # 检查 docker-compose.prod.yml 文件
-    if [ ! -f docker-compose.prod.yml ]; then
-        log_error "docker-compose.prod.yml 文件不存在"
+    # 检查 docker-compose.yml 文件
+    if [ ! -f docker-compose.yml ]; then
+        log_error "docker-compose.yml 文件不存在"
         exit 1
     fi
     
     # 停止现有服务
     log_info "停止现有服务..."
-    $COMPOSE_CMD -f docker-compose.prod.yml down 2>/dev/null || true
+    $COMPOSE_CMD -f docker-compose.yml down 2>/dev/null || true
     
     # 构建并启动服务
     log_info "构建并启动服务..."
-    $COMPOSE_CMD -f docker-compose.prod.yml up -d --build
+    $COMPOSE_CMD -f docker-compose.yml up -d --build
     
     # 等待服务启动
     log_info "等待服务启动..."
@@ -174,7 +174,7 @@ deploy_app() {
         
         if [ $i -eq 10 ]; then
             log_error "服务启动失败，请检查日志"
-            $COMPOSE_CMD -f docker-compose.prod.yml logs
+            $COMPOSE_CMD -f docker-compose.yml logs
             exit 1
         fi
     done
@@ -194,10 +194,10 @@ show_access_info() {
     echo "  健康检查: http://localhost:8000/health"
     echo ""
     echo "管理命令:"
-    echo "  查看日志: $COMPOSE_CMD -f docker-compose.prod.yml logs -f"
-    echo "  停止服务: $COMPOSE_CMD -f docker-compose.prod.yml down"
-    echo "  重启服务: $COMPOSE_CMD -f docker-compose.prod.yml restart"
-    echo "  查看状态: $COMPOSE_CMD -f docker-compose.prod.yml ps"
+    echo "  查看日志: $COMPOSE_CMD -f docker-compose.yml logs -f"
+    echo "  停止服务: $COMPOSE_CMD -f docker-compose.yml down"
+    echo "  重启服务: $COMPOSE_CMD -f docker-compose.yml restart"
+    echo "  查看状态: $COMPOSE_CMD -f docker-compose.yml ps"
     echo ""
     echo "配置文件:"
     echo "  敏感词库: config/sensitive_words.txt"
