@@ -1,0 +1,7 @@
+fastapi==0.109.2
+uvicorn==0.27.1
+pydantic==2.6.1
+python-docx==0.8.11
+PyPDF2==3.0.1
+requests==2.32.3  # 新增：用于调用 Ollama API
+python-multipart==0.0.9
