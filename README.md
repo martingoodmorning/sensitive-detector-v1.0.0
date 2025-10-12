@@ -14,7 +14,6 @@
 - [前端界面](#前端界面)
 - [配置说明](#配置说明)
 - [部署指南](#部署指南)
-- [Docker 配置指南](#docker-配置指南)
 - [开发指南](#开发指南)
 - [故障排除](#故障排除)
 
@@ -24,9 +23,12 @@
 
 ### 核心价值
 
-- **双重检测**：规则匹配 + LLM 智能检测
-- **多格式支持**：文本、PDF、DOCX 文档
-- **实时检测**：毫秒级响应时间
+- **双重检测**：规则匹配快速筛选 + 存疑内容LLM智能检测
+- **多格式支持**：文本、PDF、DOCX、DOC 文档 + 图片OCR识别
+- **实时检测**：毫秒级响应时间。单个语句正常响应时间约5ms，存疑内容单次响应时间约450ms，连续响应时间约150ms，适用于实时性要求高场景。
+- **支持严格模式**：取消规则匹配快速预筛，所有输入均使用大模型检测，适用于检测率要求高的场景。
+- **敏感词库管理**：支持敏感词库选择、构建、编辑、移除等功能，操作简洁友好。
+- **大模型优化**：LLM使用Qwen7B INT4量化模型
 - **Web界面**：简洁美观的 Web 界面
 - **容器化部署**：Docker 一键部署
 
@@ -37,7 +39,7 @@
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   前端界面      │    │   后端 API      │    │   Ollama LLM    │
-│   (HTML/CSS/JS) │◄──►│   (FastAPI)     │◄──►│   (qwen:7b)     │
+│   (HTML/CSS/JS) │◄──►│   (FastAPI)     │◄──►│   (qwen2.5:7b)  │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          │                       │                       │
@@ -58,7 +60,12 @@
 - **Pydantic**: 数据验证和序列化
 - **PyPDF2**: PDF 文档解析
 - **python-docx**: DOCX 文档解析
-- **Trie**: 敏感词匹配算法
+- **antiword**: DOC 文档解析工具
+- **pytesseract**: OCR 文字识别
+- **Tesseract OCR**: 图片文字识别引擎
+- **AC自动机**: 多模式字符串匹配算法
+- **DFA**: 确定性有限自动机
+- **文本预处理**: 字符归一化和变体统一
 
 #### 前端技术
 - **HTML5**: 语义化标记
@@ -69,7 +76,7 @@
 
 #### AI 技术
 - **Ollama**: 本地 LLM 运行环境
-- **Qwen:7b**: 通义千问 7B 参数模型
+- **Qwen2.5:7b**: 通义千问 2.5 版本 7B 参数模型（量化版本）
 - **Prompt Engineering**: 提示词工程优化
 
 #### 部署技术
@@ -83,17 +90,20 @@
 
 1. **文本检测**
    - 实时文本敏感词检测
-   - 规则匹配 + LLM 双重验证
+   - 默认模式：规则匹配快速筛选 + 存疑内容大模型检测
+   - 严格模式：跳过规则匹配，直接使用大模型检测
    - 字符计数和输入验证
 
 2. **文档检测**
-   - 支持 TXT、PDF、DOCX 格式
+   - 支持 TXT、PDF、DOCX、DOC 格式
+   - 支持图片OCR识别（JPG、PNG、BMP、GIF、TIFF）
    - 文件大小限制（10MB）
    - 字符限制（10000个字符）
    - 拖拽上传支持
+   - 严格模式：直接使用大模型检测
 
 3. **智能检测**
-   - 基于 Trie 树的敏感词匹配
+   - 基于 AC自动机 + DFA 的敏感词匹配
    - 大语言模型内容理解
    - 检测结果一致性保证
 
@@ -124,34 +134,33 @@ graph TD
 
 - Docker & Docker Compose
 - WSL (Windows 用户)
-- 8GB+ 内存 (运行 qwen:7b 模型)
+- 8GB+ 内存 (运行 qwen2.5:7b 量化模型)
 
-### 安装步骤
+### 一键启动
 
-1. **克隆项目**
-   ```bash
-   git clone https://gitee.com/saisai5203/sensitive-detector-v1.0.0.git
-   cd sensitive-detector
-   ```
+```bash
+# 1. 克隆项目
+git clone https://gitee.com/saisai5203/sensitive-detector-v1.0.0.git
+cd sensitive-detector
 
-2. **启动 Ollama 服务**
-   ```bash
-   # 在 WSL 中启动 Ollama
-   export OLLAMA_HOST=0.0.0.0:11434
-   ollama serve
-   
-   # 下载 qwen:7b 模型
-   ollama pull qwen:7b
-   ```
+# 2. 启动 Ollama 服务
+export OLLAMA_HOST=0.0.0.0:11434
+ollama serve &
+ollama pull qwen2.5:7b-instruct-q4_K_M
 
-3. **启动项目**
-   ```bash
-   docker compose up -d
-   ```
+# 或者使用快速设置脚本
+chmod +x scripts/setup_quantized_model.sh
+./scripts/setup_quantized_model.sh
 
-4. **访问系统**
-   - 前端界面: http://localhost:8000
-   - API 文档: http://localhost:8000/api/docs
+# 3. 启动项目
+docker compose up -d
+
+# 4. 访问系统
+# 前端界面: http://localhost:8000
+# API 文档: http://localhost:8000/docs
+```
+
+详细部署说明请参考 [部署指南](#部署指南)。
 
 ## 📚 API 文档
 
@@ -295,24 +304,58 @@ graph TD
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
 | `OLLAMA_BASE_URL` | `http://172.20.0.1:11434` | Ollama 服务地址 |
-| `OLLAMA_MODEL` | `qwen:7b` | 使用的 LLM 模型 |
+| `OLLAMA_MODEL` | `qwen2.5:7b-instruct-q4_K_M` | 使用的 LLM 模型（推荐量化版本） |
 | `CORS_ALLOW_ORIGINS` | `*` | CORS 允许的源 |
 | `PYTHONUNBUFFERED` | `1` | Python 输出缓冲 |
 
+### 量化模型配置
+
+**推荐使用量化的Qwen模型以提升性能：**
+
+| 模型 | 大小 | 内存占用 | 适用场景 |
+|------|------|----------|----------|
+| `qwen2.5:7b-instruct-q4_K_M` | ~4.1GB | ~6GB | 生产环境（推荐） |
+| `qwen2.5:3b-instruct-q4_K_M` | ~1.9GB | ~3GB | 开发测试 |
+| `qwen2.5:1.5b-instruct-q4_K_M` | ~0.9GB | ~2GB | 资源受限环境 |
+
+
+**下载量化模型：**
+```bash
+# 推荐使用7B INT4量化版本
+ollama pull qwen2.5:7b-instruct-q4_K_M
+
+# 或使用更轻量的3B版本
+ollama pull qwen2.5:3b-instruct-q4_K_M
+```
+
+详细配置请参考：[量化模型配置指南](docs/OLLAMA_QUANTIZED_MODELS.md)
+
 ### 敏感词配置
 
-敏感词库文件: `backend/sensitive_words.txt`
+**默认词库位置**: `word_libraries/` 目录
 
-格式要求:
+系统会自动使用 `word_libraries/` 目录中的所有 `.txt` 文件作为默认词库。如果目录为空，系统会自动创建一个包含基础敏感词的默认词库。
+
+**词库格式要求**:
 - 每行一个敏感词
 - UTF-8 编码
 - 支持中文和英文
+- 文件扩展名必须为 `.txt`
 
-示例:
+**词库文件示例** (`word_libraries/政治敏感词.txt`):
 ```
-敏感词1
-敏感词2
-sensitive_word
+法西斯
+纳粹
+极端主义
+恐怖主义
+```
+
+**词库文件示例** (`word_libraries/暴力词汇.txt`):
+```
+暴力
+辱骂
+威胁
+伤害
 ```
 
 ### Docker 配置
@@ -327,101 +370,53 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/sensitive_words.txt:/app/sensitive_words.txt
       - ./frontend:/app/frontend
+      - ./word_libraries:/app/word_libraries
+      - ./detection_config.json:/app/detection_config.json
     environment:
       - OLLAMA_BASE_URL=http://172.20.0.1:11434
-      - OLLAMA_MODEL=qwen:7b
+      - OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
     restart: unless-stopped
 ```
 
 ## 🚢 部署指南
 
-### Docker Compose 配置选择
-
-本项目提供两个 Docker Compose 配置文件：
-
-- **docker-compose.yml**: 开发环境配置，依赖外部 Ollama 服务
-- **docker-compose.prod.yml**: 生产环境配置，包含完整的 Ollama 服务
-
-详细配置说明请参考 [Docker 配置指南](docs/DOCKER_COMPOSE_GUIDE.md)。
-
 ### 快速部署 (推荐)
 
 **一键部署**:
 ```bash
-# 1. 下载 Gitee 部署脚本
-wget https://gitee.com/saisai5203/sensitive-detector-v1.0.0/raw/master/scripts/gitee-deploy.sh
+# 1. 克隆项目
+git clone https://gitee.com/saisai5203/sensitive-detector-v1.0.0.git
+cd sensitive-detector
 
-# 2. 执行部署
-chmod +x gitee-deploy.sh
-./gitee-deploy.sh
+# 2. 启动 Ollama 服务
+export OLLAMA_HOST=0.0.0.0:11434
+ollama serve &
+ollama pull qwen2.5:7b-instruct-q4_K_M
 
-# 3. 访问系统
+# 3. 启动项目
+docker compose up -d
+
+# 4. 访问系统
 # 浏览器打开: http://localhost:8000
 ```
 
-### 手动部署
+### 环境要求
 
-1. **服务器要求**
-   - Ubuntu 20.04+ 或 CentOS 8+
-   - Docker 20.10+
-   - Docker Compose 2.0+
-   - 8GB+ 内存 (推荐 16GB)
-   - 20GB+ 磁盘空间
+- **操作系统**: Linux (Ubuntu 20.04+ 推荐) 或 Windows WSL
+- **Docker**: 20.10+ 
+- **Docker Compose**: 2.0+
+- **内存**: 8GB+ (推荐 16GB，运行 qwen2.5:7b 量化模型)
+- **磁盘**: 20GB+ 可用空间
 
-2. **部署步骤**
-   ```bash
-   # 1. 安装 Docker
-   curl -fsSL https://get.docker.com -o get-docker.sh
-   sh get-docker.sh
-   
-   # 2. 安装 Docker Compose
-   sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-   sudo chmod +x /usr/local/bin/docker-compose
-   
-   # 3. 启动 Ollama 服务
-   curl -fsSL https://ollama.ai/install.sh | sh
-   ollama serve &
-   ollama pull qwen:7b
-   
-   # 4. 部署应用
-   git clone https://gitee.com/your-username/sensitive-detector.git
-   cd sensitive-detector
-   docker compose up -d
-   ```
+### 详细部署说明
 
-3. **Nginx 反向代理** (可选)
-   ```nginx
-   server {
-       listen 80;
-       server_name your-domain.com;
-       
-       location / {
-           proxy_pass http://localhost:8000;
-           proxy_set_header Host $host;
-           proxy_set_header X-Real-IP $remote_addr;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-       }
-   }
-   ```
-
-### Docker 打包移植
-
-详细的 Docker 打包移植指南请参考 [Docker 部署文档](docs/DOCKER_DEPLOYMENT.md)，包括：
-- 多阶段构建优化
-- 镜像打包策略
-- 一键部署脚本
-- 部署注意事项
+详细的 Docker 部署指南请参考 [Docker 部署文档](docs/DOCKER_DEPLOYMENT.md)，包括：
+- Docker 配置说明
+- 环境变量配置
 - 故障排除指南
+- 性能优化建议
 
-### Gitee 部署（国内用户）
-
-由于网络访问限制，国内用户推荐使用 Gitee 部署，详细指南请参考 [Gitee 部署文档](docs/GITEE_DEPLOYMENT.md)，包括：
-- Gitee 仓库配置
-- 国内网络优化
-- 镜像加速配置
-- 故障排除指南
 
 ### 监控和维护
 
@@ -460,7 +455,7 @@ chmod +x gitee-deploy.sh
    
    # 4. 启动 Ollama
    ollama serve &
-   ollama pull qwen:7b
+   ollama pull qwen2.5:7b-instruct-q4_K_M
    
    # 5. 启动后端服务
    cd backend
@@ -510,128 +505,6 @@ chmod +x gitee-deploy.sh
    - test: 测试相关
    - chore: 构建过程或辅助工具的变动
 
-### 测试指南
-
-1. **API 测试**
-   ```bash
-   # 文本检测测试
-   curl -X POST "http://localhost:8000/detect/text" \
-        -H "Content-Type: application/json" \
-        -d '{"text":"测试文本"}'
-   
-   # 文档检测测试
-   curl -X POST "http://localhost:8000/detect/document" \
-        -F "file=@test.pdf"
-   ```
-
-2. **前端测试**
-   - 浏览器兼容性测试
-   - 响应式设计测试
-   - 交互功能测试
-   - 性能测试
-
-## 🔧 故障排除
-
-### 常见问题
-
-#### 1. Ollama 连接失败
-
-**问题**: `Ollama API 调用失败`
-
-**解决方案**:
-```bash
-# 检查 Ollama 服务状态
-ps aux | grep ollama
-
-# 重启 Ollama 服务
-pkill ollama
-export OLLAMA_HOST=0.0.0.0:11434
-ollama serve &
-
-# 检查网络连接
-curl http://localhost:11434/api/tags
-```
-
-#### 2. Docker 容器无法启动
-
-**问题**: 容器启动失败
-
-**解决方案**:
-```bash
-# 查看容器日志
-docker compose logs sensitive-detector-backend
-
-# 重新构建镜像
-docker compose down
-docker compose build --no-cache
-docker compose up -d
-```
-
-#### 3. 前端资源加载失败
-
-**问题**: CSS/JS 文件 404 错误
-
-**解决方案**:
-```bash
-# 检查文件路径
-ls -la frontend/
-
-# 检查 Docker 挂载
-docker compose exec sensitive-detector-backend ls -la /app/frontend/
-
-# 重启容器
-docker compose restart
-```
-
-#### 4. LLM 检测结果不一致
-
-**问题**: 相同输入产生不同结果
-
-**解决方案**:
-```python
-# 检查 temperature 参数
-# 在 backend/main.py 中确保 temperature=0
-
-# 检查模型状态
-curl -X POST http://localhost:11434/api/generate \
-     -H "Content-Type: application/json" \
-     -d '{"model": "qwen:7b", "prompt": "测试", "stream": false}'
-```
-
-### 性能优化
-
-1. **LLM 性能优化**
-   - 使用 GPU 加速 (如果可用)
-   - 调整模型参数
-   - 实现结果缓存
-
-2. **API 性能优化**
-   - 添加请求限流
-   - 实现异步处理
-   - 优化数据库查询
-
-3. **前端性能优化**
-   - 资源压缩
-   - 缓存策略
-   - 懒加载实现
-
-### 安全考虑
-
-1. **输入验证**
-   - 文件类型检查
-   - 文件大小限制
-   - 内容长度限制
-
-2. **API 安全**
-   - CORS 配置
-   - 请求频率限制
-   - 错误信息过滤
-
-3. **部署安全**
-   - HTTPS 配置
-   - 防火墙设置
-   - 定期安全更新
-
 
 ### 联系方式
 
@@ -642,6 +515,5 @@ curl -X POST http://localhost:11434/api/generate \
 ### 贡献指南
 
 
-
-**最后更新**: 2025年10月
+**最后更新**: 2025年1月
 **版本**: v1.0.0

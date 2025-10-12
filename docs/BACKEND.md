@@ -26,7 +26,9 @@
 │   ├── 文档解析服务
 │   └── 结果整合服务
 ├── 算法层
-│   ├── Trie 树敏感词匹配
+│   ├── 文本预处理（字符归一化）
+│   ├── AC自动机多模式匹配
+│   ├── DFA精确验证
 │   └── LLM 智能检测
 └── 外部服务
     └── Ollama LLM 服务
@@ -39,7 +41,7 @@ backend/
 ├── main.py                 # 主应用文件
 ├── requirements.txt        # Python 依赖
 ├── Dockerfile             # Docker 构建文件
-└── sensitive_words.txt     # 敏感词库
+└── word_libraries/         # 敏感词库目录
 ```
 
 ## 核心文件详解
@@ -105,9 +107,9 @@ class DetectionResponse(BaseModel):
 
 #### 敏感词检测算法
 
-**Trie 树实现**:
+**AC自动机实现**:
 ```python
-class TrieNode:
+class ACAutomaton:
     def __init__(self):
         self.children = {}
         self.is_end = False
@@ -162,7 +164,7 @@ class SensitiveWordDetector:
 def call_ollama_api(text: str) -> str:
     """调用 Ollama API 进行 LLM 检测"""
     base_url = os.getenv("OLLAMA_BASE_URL", "http://172.20.0.1:11434").rstrip("/")
-    model_name = os.getenv("OLLAMA_MODEL", "qwen:7b")
+    model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct-q4_K_M")
     ollama_url = f"{base_url}/api/generate"
     
     # 优化的提示词
@@ -303,7 +305,7 @@ async def detect_document(file: UploadFile = File(...)):
         if file.content_type not in allowed_types:
             raise HTTPException(
                 status_code=400, 
-                detail="不支持的文件类型，仅支持 TXT、PDF、DOCX 格式"
+                detail="不支持的文件类型，仅支持 TXT、PDF、DOCX、DOC 格式和图片格式（OCR）"
             )
         
         # 文件大小检查 (10MB)
@@ -370,31 +372,36 @@ async def read_docs():
 
 ## 算法详解
 
-### Trie 树敏感词匹配
+### 规则匹配引擎（预处理+AC+DFA）
 
 **算法原理**:
-1. 构建 Trie 树：将敏感词库构建成前缀树
-2. 文本扫描：逐字符扫描输入文本
-3. 模式匹配：在 Trie 树中查找匹配的敏感词
+1. 文本预处理：字符归一化（全角转半角、繁体转简体、特殊符号移除）
+2. AC自动机匹配：多模式字符串匹配，快速识别可能的敏感词
+3. DFA精确验证：对AC标记的可疑文本片段进行精确匹配验证
 4. 结果收集：收集所有匹配的敏感词
 
 **时间复杂度**:
-- 构建 Trie 树: O(n*m)，n 为敏感词数量，m 为平均长度
-- 文本检测: O(k)，k 为文本长度
+- 文本预处理: O(k)，k 为文本长度
+- AC自动机构建: O(n*m)，n 为敏感词数量，m 为平均长度
+- AC匹配: O(k+z)，k 为文本长度，z 为匹配数量
+- DFA验证: O(z*m)，z 为可疑片段数量，m 为平均长度
 
 **空间复杂度**:
-- Trie 树存储: O(n*m)
+- AC自动机存储: O(n*m)
+- DFA状态机: O(n*m)
 - 检测过程: O(1)
 
 **优势**:
-- 高效的字符串匹配
+- 高效的字符串匹配（AC自动机）
 - 支持多模式匹配
+- 精确的二次验证（DFA）
+- 统一的变体处理（文本预处理）
 - 内存使用合理
 
 ### LLM 智能检测
 
 **模型选择**:
-- **Qwen:7b**: 通义千问 7B 参数模型
+- **Qwen2.5:7b**: 通义千问 2.5 版本 7B 参数模型（量化版本）
 - **本地部署**: 使用 Ollama 框架
 - **一致性优化**: temperature=0 确保输出一致
 
@@ -470,7 +477,7 @@ prompt = f"""
 1. **对象复用**:
    ```python
    # 复用 Trie 树实例
-   detector = SensitiveWordDetector("sensitive_words.txt")
+   detector = SensitiveWordDetector(["word_libraries/政治敏感词.txt", "word_libraries/暴力词汇.txt"])
    ```
 
 2. **垃圾回收**:
@@ -764,7 +771,7 @@ python-multipart==0.0.6
 ```bash
 # Ollama 配置
 OLLAMA_BASE_URL=http://172.20.0.1:11434
-OLLAMA_MODEL=qwen:7b
+OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
 
 # 应用配置
 PYTHONUNBUFFERED=1

@@ -198,6 +198,70 @@ body {
     margin-top: 15px;
 }
 
+.input-options {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 16px;
+    color: #333;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 500;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(102, 126, 234, 0.05);
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    transition: all 0.3s ease;
+}
+
+.checkbox-label:hover {
+    background: rgba(102, 126, 234, 0.1);
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.checkbox-label input[type="checkbox"] {
+    display: none;
+}
+
+.checkmark {
+    width: 28px;
+    height: 28px;
+    border: 2px solid #e1e5e9;
+    border-radius: 6px;
+    background: white;
+    position: relative;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.checkbox-label input[type="checkbox"]:checked + .checkmark {
+    background: #667eea;
+    border-color: #667eea;
+}
+
+.checkbox-label input[type="checkbox"]:checked + .checkmark::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.checkbox-label:has(input[type="checkbox"]:checked) {
+    background: rgba(102, 126, 234, 0.15);
+    border-color: #667eea;
+    color: #667eea;
+}
+
 .char-count {
     color: #666;
     font-size: 0.9rem;
@@ -401,6 +465,90 @@ body {
     color: #721c24;
 }
 
+.status-skipped {
+    background: #d4edda;
+    color: #155724;
+}
+
+/* 严格模式复选框样式 - 左下角 */
+.strict-mode-container {
+    margin: 8px 0 0 0;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border: none;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+    max-width: 300px;
+}
+
+.strict-mode-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+    line-height: 1;
+    width: 280px;
+}
+
+.strict-mode-checkbox input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #007bff;
+    cursor: pointer;
+    transform: scale(1.1);
+    flex-shrink: 0;
+    margin: 0;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+}
+
+.checkbox-label {
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+    line-height: 1;
+    margin: 0;
+    display: inline-block;
+    white-space: nowrap;
+    width: 200px;
+    text-align: center;
+}
+
+.checkbox-tooltip {
+    font-size: 12px;
+    color: #666;
+    font-style: italic;
+    margin-left: 26px;
+    line-height: 1.3;
+    width: 280px;
+}
+
+/* OCR提示样式 */
+.ocr-notice {
+    font-size: 12px;
+    color: #007bff;
+    margin-top: 5px;
+    font-weight: 500;
+}
+
+/* 严格模式提示样式 */
+.strict-mode-notice {
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-top: 10px;
+    font-size: 12px;
+    border-left: 3px solid #2196f3;
+}
+
 /* 加载状态 */
 .loading-overlay {
     position: fixed;
@@ -548,31 +696,435 @@ body {
     gap: 10px;
 }
 
-/* 通知动画 */
-@keyframes slideIn {
-    from {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
+/* 词库选择样式 */
+.library-selection {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-@keyframes slideOut {
-    from {
-        transform: translateX(0);
-        opacity: 1;
-    }
-    to {
-        transform: translateX(100%);
-        opacity: 0;
-    }
+.library-selection label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #333;
 }
 
-.notification-content {
+.library-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.library-controls select {
+    flex: 1;
+    padding: 10px 15px;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    background: white;
+    font-size: 14px;
+    min-height: 40px;
+}
+
+.library-controls select[multiple] {
+    min-height: 80px;
+}
+
+.library-info {
+    font-size: 14px;
+    color: #666;
+    font-style: italic;
+}
+
+/* 词库管理样式 */
+.libraries-section {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.used-libraries-section {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.section-header {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.section-header h3 {
+    color: #333;
+    font-size: 1.2rem;
+    margin-bottom: 5px;
+}
+
+.section-header p {
+    color: #666;
+    font-size: 14px;
+    margin: 0;
+}
+
+.used-libraries-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 15px;
+    min-height: 40px;
+    padding: 10px;
+    border: 2px dashed #e1e5e9;
+    border-radius: 8px;
+    background: #f8f9fa;
+}
+
+.used-libraries-list:empty::before {
+    content: "暂无使用词库，请从下方词库列表中添加";
+    color: #999;
+    font-style: italic;
     display: flex;
     align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 40px;
+}
+
+.used-library-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #667eea;
+    color: white;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.used-library-item .remove-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.3s ease;
+}
+
+.used-library-item .remove-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.used-libraries-info {
+    font-size: 14px;
+    color: #666;
+    font-style: italic;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+}
+
+.libraries-content {
+    display: flex;
+    gap: 30px;
+    align-items: flex-start;
+}
+
+.libraries-content {
+    display: flex;
+    gap: 30px;
+    align-items: flex-start;
+}
+
+.libraries-list {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.list-header h3 {
+    color: #333;
+    font-size: 1.2rem;
+}
+
+.libraries-table {
+    width: 100%;
+}
+
+.library-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    border: 1px solid #e1e5e9;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.library-item:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.library-info-item {
+    flex: 1;
+}
+
+.library-name {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.library-details {
+    font-size: 14px;
+    color: #666;
+}
+
+.library-actions {
+    display: flex;
     gap: 10px;
+}
+
+.library-actions .btn {
+    padding: 8px 12px;
+    font-size: 12px;
+}
+
+.library-editor {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.editor-header h3 {
+    color: #333;
+    font-size: 1.2rem;
+}
+
+.editor-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.editor-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: #333;
+}
+
+.form-group input,
+.form-group textarea {
+    padding: 12px 15px;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.textarea-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #666;
+}
+
+/* 用时显示样式 */
+.timing-info {
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.timing-section {
+    margin-bottom: 8px;
+    padding: 8px;
+    background: rgba(102, 126, 234, 0.05);
+    border-radius: 6px;
+    border-left: 3px solid #667eea;
+}
+
+.timing-section:last-child {
+    margin-bottom: 0;
+}
+
+.timing-section strong {
+    color: #333;
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+.timing-item {
+    display: inline-block;
+    margin-right: 12px;
+    padding: 2px 6px;
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 4px;
+    font-size: 12px;
+    color: #667eea;
+    font-weight: 500;
+}
+
+.timing-total {
+    display: inline-block;
+    padding: 2px 8px;
+    background: #667eea;
+    color: white;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.timing-overall {
+    background: rgba(102, 126, 234, 0.1);
+    border-left-color: #764ba2;
+}
+
+.timing-overall .timing-total {
+    background: #764ba2;
+}
+
+.timing-skipped {
+    opacity: 0.6;
+    text-decoration: line-through;
+}
+
+/* 检测模式选择样式 */
+.detection-modes {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #333;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 500;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: rgba(102, 126, 234, 0.05);
+    border: 1px solid rgba(102, 126, 234, 0.2);
+    transition: all 0.3s ease;
+}
+
+.radio-label:hover {
+    background: rgba(102, 126, 234, 0.1);
+    border-color: rgba(102, 126, 234, 0.3);
+}
+
+.radio-label input[type="radio"] {
+    display: none;
+}
+
+.radio-mark {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #e1e5e9;
+    border-radius: 50%;
+    background: white;
+    position: relative;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.radio-label input[type="radio"]:checked + .radio-mark {
+    background: #667eea;
+    border-color: #667eea;
+}
+
+.radio-label input[type="radio"]:checked + .radio-mark::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 6px;
+    height: 6px;
+    background: white;
+    border-radius: 50%;
+}
+
+.radio-label:has(input[type="radio"]:checked) {
+    background: rgba(102, 126, 234, 0.15);
+    border-color: #667eea;
+    color: #667eea;
+}
+
+/* 检测控制区域样式 */
+.detection-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.detection-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.detection-checkboxes {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
 }

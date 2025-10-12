@@ -66,6 +66,13 @@ Content-Type: application/json
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | text | string | 是 | 待检测的文本内容，最大长度 10000 字符 |
+| fast_mode | boolean | 否 | 快速模式，默认false（规则匹配+LLM双重检测） |
+| strict_mode | boolean | 否 | 严格模式，默认false（跳过规则匹配，直接LLM检测） |
+
+**检测模式说明**:
+- **默认模式** (fast_mode=false, strict_mode=false): 规则匹配快速筛选 + 存疑内容大模型检测
+- **严格模式** (strict_mode=true): 跳过规则匹配，直接使用大模型检测
+- **快速模式** (fast_mode=true): 仅使用规则匹配算法（已废弃，建议使用默认模式）
 
 **响应示例**:
 ```json
@@ -114,6 +121,8 @@ Content-Type: multipart/form-data
 - TXT (.txt)
 - PDF (.pdf)
 - DOCX (.docx)
+- DOC (.doc) - 使用antiword工具解析
+- 图片格式 (.jpg, .jpeg, .png, .bmp, .gif, .tiff) - 使用OCR识别
 
 **文件大小限制**: 10MB
 
@@ -297,6 +306,14 @@ curl -X GET "http://localhost:8000/health"
 
 ## 版本历史
 
+### v1.1.0 (2025-01-XX)
+- 新增严格模式：跳过规则匹配，直接使用大模型检测
+- 优化默认模式：规则匹配快速筛选 + 存疑内容大模型检测
+- 新增DOC文件支持：使用antiword工具解析DOC格式
+- 新增OCR功能：支持图片文字识别（JPG、PNG、BMP、GIF、TIFF）
+- 优化OCR配置：支持中英文混合识别
+- 改进错误处理：提供更详细的错误信息
+
 ### v1.0.0 (2024-01-01)
 
 - 初始版本发布
@@ -309,7 +326,7 @@ curl -X GET "http://localhost:8000/health"
 ### 2024-01-01
 - 修复 Ollama 连接问题
 - 优化 LLM 检测一致性
-- 升级到 qwen:7b 模型
+- 升级到 qwen2.5:7b 量化模型
 - 改进错误处理机制
 
 ## 技术支持

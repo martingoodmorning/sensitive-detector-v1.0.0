@@ -5,13 +5,15 @@ services:
     ports:
       - "8000:8000"  # 端口映射：Windows/WSL的8000端口 → 容器的8000端口（前端可访问）
     volumes:
-      # 挂载：WSL的backend/sensitive_words.txt → 容器的/app/sensitive_words.txt（方便修改敏感词库）
-      - ./backend/sensitive_words.txt:/app/sensitive_words.txt
       # 挂载：WSL的frontend目录 → 容器的/app/frontend目录（提供静态文件）
       - ./frontend:/app/frontend
+      # 挂载：词库管理目录（默认使用此目录中的词库）
+      - ./word_libraries:/app/word_libraries
+      # 挂载：检测配置文件（持久化检测词库配置）
+      - ./detection_config.json:/app/detection_config.json
     environment:
       - PYTHONUNBUFFERED=1  # 实时输出Python日志（方便排查问题）
       - OLLAMA_BASE_URL=http://172.20.0.1:11434
-      - OLLAMA_MODEL=qwen:7b
+      - OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
       - CORS_ALLOW_ORIGINS=*
     restart: unless-stopped  # 容器异常退出时自动重启（提高稳定性）

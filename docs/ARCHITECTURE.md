@@ -176,32 +176,52 @@ class Application:
 
 **规则匹配算法**:
 ```python
-class TrieNode:
+class TextPreprocessor:
     def __init__(self):
-        self.children = {}
-        self.is_end = False
-        self.word = ""
-
-class SensitiveWordDetector:
-    def __init__(self, words_file: str):
-        self.root = TrieNode()
-        self.load_words(words_file)
+        """文本预处理器，用于统一字符格式，消除无意义变体"""
+        self.setup_normalization_rules()
     
-    def detect(self, text: str) -> List[str]:
-        """Trie 树敏感词检测"""
-        sensitive_words = []
-        text_lower = text.lower()
-        
-        for i in range(len(text_lower)):
-            node = self.root
-            j = i
-            while j < len(text_lower) and text_lower[j] in node.children:
-                node = node.children[text_lower[j]]
-                if node.is_end:
-                    sensitive_words.append(node.word)
-                j += 1
-        
-        return list(set(sensitive_words))
+    def normalize_text(self, text):
+        """文本归一化处理"""
+        # 1. 全角转半角
+        # 2. 繁体转简体  
+        # 3. 移除特殊符号
+        return normalized_text
+
+class ACAutomaton:
+    def __init__(self, words):
+        """AC自动机，用于多模式字符串匹配"""
+        self.build_automaton(words)
+    
+    def search(self, text):
+        """搜索匹配的敏感词"""
+        return results, suspicious_segments
+
+class DFAFilter:
+    def __init__(self, words):
+        """DFA过滤器，用于精确验证"""
+        self.build_dfa(words)
+    
+    def precise_match(self, text, segments):
+        """精确匹配验证"""
+        return results
+
+class ThreeStepFilter:
+    def __init__(self, word_paths):
+        self.text_preprocessor = TextPreprocessor()
+        self.ac_automaton = ACAutomaton(words)
+        self.dfa_filter = DFAFilter(words)
+    
+    def detect(self, text):
+        """规则匹配检测（预处理+AC+DFA）"""
+        # 1. 文本预处理
+        normalized_text = self.text_preprocessor.preprocess_text(text)
+        # 2. AC自动机匹配
+        ac_results, suspicious_segments = self.ac_automaton.search(normalized_text)
+        # 3. DFA精确验证
+        dfa_results = self.dfa_filter.precise_match(text, suspicious_segments)
+        # 4. 合并结果
+        return combined_results
 ```
 
 **LLM 检测算法**:
