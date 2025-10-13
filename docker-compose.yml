@@ -2,8 +2,7 @@ services:
   sensitive-detector-backend:
     build: ./backend # 构建后端镜像（使用./backend/Dockerfile）
     container_name: sensitive-detector  # 容器名（方便后续管理）
-    ports:
-      - "8000:8000"  # 端口映射：Windows/WSL的8000端口 → 容器的8000端口（前端可访问）
+    network_mode: host  # 使用host网络模式，直接访问宿主机服务
     volumes:
       # 挂载：WSL的frontend目录 → 容器的/app/frontend目录（提供静态文件）
       - ./frontend:/app/frontend
@@ -12,8 +11,8 @@ services:
       # 挂载：检测配置文件（持久化检测词库配置）
       - ./detection_config.json:/app/detection_config.json
     environment:
-      - PYTHONUNBUFFERED=1  # 实时输出Python日志（方便排查问题）
-      - OLLAMA_BASE_URL=http://172.20.0.1:11434
+      - PYTHONUNBUFFERED=1  
+      - OLLAMA_BASE_URL=http://localhost:11434
       - OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
       - CORS_ALLOW_ORIGINS=*
     restart: unless-stopped  # 容器异常退出时自动重启（提高稳定性）

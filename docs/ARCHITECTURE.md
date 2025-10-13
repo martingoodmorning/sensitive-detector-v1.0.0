@@ -73,10 +73,74 @@ graph TB
 | 前端 | HTML5/CSS3/JavaScript | 原生技术栈 |
 | 后端 | FastAPI/Python 3.10 | 现代化 Web 框架 |
 | AI 服务 | Ollama/Qwen:7b | 本地 LLM 部署 |
-| 容器化 | Docker/Docker Compose | 容器编排 |
+| 容器化 | Docker/Docker Compose | 容器编排（Host网络模式） |
 | 反向代理 | Nginx | 负载均衡和 SSL |
 | 监控 | Prometheus/Grafana | 系统监控 |
 | 日志 | ELK Stack | 日志分析 |
+
+### 网络架构
+
+#### Docker网络配置
+
+**Host模式（默认推荐）**：
+```yaml
+services:
+  sensitive-detector-backend:
+    network_mode: host  # 使用宿主机网络
+    environment:
+      - OLLAMA_BASE_URL=http://localhost:11434
+```
+
+**网络架构图**：
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Windows浏览器  │    │   WSL宿主机     │    │   Docker容器    │
+│                 │    │                 │    │                 │
+│ http://localhost│◄──►│ localhost:8000  │◄──►│ FastAPI服务     │
+│ :8000           │    │ localhost:11434 │◄──►│ Ollama服务      │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+**优势**：
+- ✅ Ollama连接稳定可靠
+- ✅ 网络配置简单
+- ✅ 适合本地开发环境
+- ✅ 减少网络转发层
+
+**注意事项**：
+- ⚠️ 容器直接使用宿主机网络
+- ⚠️ 适合开发环境，生产环境需谨慎
+
+#### Bridge模式（可选）
+
+**配置**：
+```yaml
+services:
+  sensitive-detector-backend:
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_BASE_URL=http://172.17.0.1:11434
+```
+
+**网络架构图**：
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Windows浏览器  │    │   WSL宿主机     │    │   Docker网络    │
+│                 │    │                 │    │                 │
+│ http://localhost│◄──►│ localhost:8000  │◄──►│ 172.17.0.2:8000 │
+│ :8000           │    │ localhost:11434 │◄──►│ 172.17.0.1:11434│
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+**优势**：
+- ✅ 网络隔离性好
+- ✅ 适合生产环境
+- ✅ 安全性更高
+
+**注意事项**：
+- ⚠️ 需要确保Ollama服务可被Docker网关访问
+- ⚠️ 可能需要额外的网络配置
 
 ## 核心组件
 

@@ -564,6 +564,98 @@ class ThreeStepFilter:
 # 默认使用word_libraries中的词库
 
 # 模型预热函数
+
+def call_ollama_api(text: str) -> str:
+    """
+    调用 Ollama 本地 API，检测文本是否含敏感内容
+    返回："敏感" 或 "正常"（容错处理后）
+    """
+    
+    # 记录调用时间
+    call_start_time = time.time()
+    model_warm_up_status["last_call_time"] = call_start_time
+    
+    # 检查是否是冷启动
+    if not model_warm_up_status["is_warmed_up"]:
+        print("⚠️  检测到模型冷启动，可能需要较长时间...")
+    elif model_warm_up_status["warm_up_time"]:
+        time_since_warmup = call_start_time - model_warm_up_status["warm_up_time"]
+        if time_since_warmup > 300:  # 5分钟后认为可能冷启动
+            print(f"⚠️  距离预热已过{time_since_warmup:.0f}秒，可能触发冷启动...")
+    
+    # Ollama API 地址与模型名通过环境变量配置
+    # 在WSL环境中，使用host.docker.internal可能无法解析，尝试多种方式
+    base_url = os.getenv("OLLAMA_BASE_URL", "http://172.17.0.1:11434").rstrip("/")
+    model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct-q4_K_M")
+    ollama_url = f"{base_url}/api/generate"
+    
+    print(f"尝试调用Ollama API: {ollama_url}")
+    print(f"使用模型: {model_name}")
+    
+    # 提示词工程：严格约束输出，确保一致性
+    prompt = f"""
+你是专业的内容安全检测系统。请严格按照以下规则进行判断：
+
+【敏感内容标准】
+包含以下任何一类内容即判定为敏感：
+1. 辱骂词汇（如：白痴、傻逼、去死等）
+2. 暴力威胁（如：杀了你、打你、伤害等）
+3. 违法内容（如：毒品、犯罪、诈骗等）
+4. 色情内容（如：性暗示、色情描述等）
+5. 歧视内容（如：种族歧视、性别歧视等）
+6. 政治敏感内容（如：法西斯、纳粹、极端主义、恐怖主义、分裂主义等）
+7. 仇恨言论（如：煽动仇恨、暴力、极端的言论）
+8. 虚假信息（如：虚假新闻、虚假宣传、虚假广告、谣言等）
+9. 欺凌言论（如：霸凌、冷暴力、孤立的言论）
+10. 隐蔽的敏感内容（如：反动内容、色情内容、暴力内容、违法内容等，但需要通过上下文才能判断）
+【检测文本】
+{text[:10000]}
+
+【判断规则】
+- 如果文本包含上述任何一类敏感内容，回答：敏感
+- 如果文本是正常的日常对话、学术讨论、新闻描述等，回答：正常
+- 对于涉及敏感词汇但属于学术研究、历史讨论、新闻报道等正当用途，回答：正常
+- 对于明确表达支持、宣扬、美化敏感内容的，回答：敏感
+
+【输出要求】
+请严格按照以下格式输出，不要添加任何其他内容：
+敏感
+或
+正常
+    """
+    
+    try:
+        # 发送 POST 请求到 Ollama API
+        print(f"发送请求到: {ollama_url}")
+        response = requests.post(
+            ollama_url,
+            json={
+                "model": model_name,
+                "prompt": prompt,
+                "stream": False,
+                "temperature": 0
+            },
+            timeout=30
+        )
+        print(f"API响应状态码: {response.status_code}")
+        response.raise_for_status()  # 若 HTTP 状态码异常，抛出错误
+        result = response.json()
+        print(f"API响应内容: {result}")
+        
+        # 提取模型响应，清理空格和换行
+        llm_output = result.get("response", "").strip()
+        print(f"模型输出: '{llm_output}'")
+        # 容错处理：若模型输出异常，默认返回"正常"
+        final_result = llm_output if llm_output in ["敏感", "正常"] else "正常"
+        print(f"最终结果: {final_result}")
+        return final_result
+    
+    except Exception as e:
+        # 捕获网络错误、API 错误等，打印日志并返回"正常"（避免服务崩溃）
+        print(f"Ollama API 调用失败：{str(e)}")
+        print(f"异常类型: {type(e).__name__}")
+        return "正常"
+
 def warm_up_model():
     """预热Ollama模型，避免第一次调用时的冷启动延迟"""
     try:
@@ -647,94 +739,6 @@ def initialize_detection_filter():
 three_step_filter = initialize_detection_filter()
 
 # ---------------------- 新增：Ollama API 调用逻辑 ----------------------
-def call_ollama_api(text: str) -> str:
-    """
-    调用 Ollama 本地 API，检测文本是否含敏感内容
-    返回："敏感" 或 "正常"（容错处理后）
-    """
-    
-    # 记录调用时间
-    call_start_time = time.time()
-    model_warm_up_status["last_call_time"] = call_start_time
-    
-    # 检查是否是冷启动
-    if not model_warm_up_status["is_warmed_up"]:
-        print("⚠️  检测到模型冷启动，可能需要较长时间...")
-    elif model_warm_up_status["warm_up_time"]:
-        time_since_warmup = call_start_time - model_warm_up_status["warm_up_time"]
-        if time_since_warmup > 300:  # 5分钟后认为可能冷启动
-            print(f"⚠️  距离预热已过{time_since_warmup:.0f}秒，可能触发冷启动...")
-    
-    # Ollama API 地址与模型名通过环境变量配置
-    # 在WSL环境中，使用host.docker.internal可能无法解析，尝试多种方式
-    base_url = os.getenv("OLLAMA_BASE_URL", "http://172.17.0.1:11434").rstrip("/")
-    model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct-q4_K_M")
-    ollama_url = f"{base_url}/api/generate"
-    
-    print(f"尝试调用Ollama API: {ollama_url}")
-    print(f"使用模型: {model_name}")
-    
-    # 提示词工程：严格约束输出，确保一致性
-    prompt = f"""
-你是专业的内容安全检测系统。请严格按照以下规则进行判断：
-
-【敏感内容标准】
-包含以下任何一类内容即判定为敏感：
-1. 辱骂词汇（如：白痴、傻逼、去死等）
-2. 暴力威胁（如：杀了你、打你、伤害等）
-3. 违法内容（如：毒品、犯罪、违法等）
-4. 色情内容（如：性暗示、色情描述等）
-5. 歧视内容（如：种族歧视、性别歧视等）
-6. 政治敏感内容（如：法西斯、纳粹、极端主义、恐怖主义、分裂主义等）
-7. 仇恨言论（如：煽动仇恨、暴力、歧视的言论）
-
-【检测文本】
-{text[:10000]}
-
-【判断规则】
-- 如果文本包含上述任何一类敏感内容，回答：敏感
-- 如果文本是正常的日常对话、学术讨论、新闻描述等，回答：正常
-- 对于涉及敏感词汇但属于学术研究、历史讨论、新闻报道等正当用途，回答：正常
-- 对于明确表达支持、宣扬、美化敏感内容的，回答：敏感
-
-【输出要求】
-请严格按照以下格式输出，不要添加任何其他内容：
-敏感
-或
-正常
-    """
-    
-    try:
-        # 发送 POST 请求到 Ollama API
-        print(f"发送请求到: {ollama_url}")
-        response = requests.post(
-            ollama_url,
-            json={
-                "model": model_name,
-                "prompt": prompt,
-                "stream": False,
-                "temperature": 0
-            },
-            timeout=30
-        )
-        print(f"API响应状态码: {response.status_code}")
-        response.raise_for_status()  # 若 HTTP 状态码异常，抛出错误
-        result = response.json()
-        print(f"API响应内容: {result}")
-        
-        # 提取模型响应，清理空格和换行
-        llm_output = result.get("response", "").strip()
-        print(f"模型输出: '{llm_output}'")
-        # 容错处理：若模型输出异常，默认返回"正常"
-        final_result = llm_output if llm_output in ["敏感", "正常"] else "正常"
-        print(f"最终结果: {final_result}")
-        return final_result
-    
-    except Exception as e:
-        # 捕获网络错误、API 错误等，打印日志并返回"正常"（避免服务崩溃）
-        print(f"Ollama API 调用失败：{str(e)}")
-        print(f"异常类型: {type(e).__name__}")
-        return "正常"
 
 
 # ---------------------- 定义请求参数格式 ----------------------

@@ -115,18 +115,74 @@
 
 ### 检测流程
 
+#### 文本检测流程
+
 ```mermaid
 graph TD
-    A[用户输入] --> B{输入类型}
-    B -->|文本| C[文本检测]
-    B -->|文档| D[文档解析]
-    D --> E[提取文本内容]
-    C --> F[规则匹配检测]
-    E --> F
-    F --> G[LLM 智能检测]
-    G --> H[结果整合]
-    H --> I[返回检测结果]
+    A[用户输入文本] --> B{检测模式}
+    B -->|严格模式| C[直接LLM检测]
+    B -->|普通模式| D[规则匹配检测]
+    D --> E{规则匹配结果}
+    E -->|发现敏感词| F[LLM智能检测]
+    E -->|未发现敏感词| G[返回正常结果]
+    F --> H[LLM检测结果]
+    C --> H
+    H --> I[返回最终结果]
+    G --> I
 ```
+
+#### 文档检测流程
+
+```mermaid
+graph TD
+    A[用户上传文档] --> B{文件类型}
+    B -->|TXT| C[直接读取文本]
+    B -->|PDF| D[PyPDF2解析]
+    B -->|DOCX| E[python-docx解析]
+    B -->|DOC| F[antiword工具解析]
+    B -->|图片| G[OCR文字识别]
+    C --> H[提取文本内容]
+    D --> H
+    E --> H
+    F --> H
+    G --> H
+    H --> I{文本是否为空}
+    I -->|是| J[返回错误]
+    I -->|否| K[严格模式LLM检测]
+    K --> L[返回检测结果]
+```
+
+#### 规则匹配检测详细流程
+
+```mermaid
+graph TD
+    A[输入文本] --> B[文本预处理]
+    B --> C[字符归一化]
+    C --> D[AC自动机初筛]
+    D --> E[可疑片段提取]
+    E --> F[DFA精确匹配]
+    F --> G[结果合并]
+    G --> H[返回匹配结果]
+```
+
+#### 检测模式说明
+
+**普通模式（默认）**：
+- 先使用规则匹配进行快速筛选
+- 如果发现敏感词，再使用LLM进行智能检测
+- 如果未发现敏感词，直接返回"正常"结果
+- 响应时间：5ms（规则匹配）+ 450ms（LLM检测，仅在发现敏感词时）
+
+**严格模式**：
+- 跳过规则匹配，直接使用LLM检测所有内容
+- 适用于检测率要求高的场景
+- 响应时间：450ms（所有内容都经过LLM检测）
+
+**文档检测**：
+- 默认使用严格模式（所有文档内容都经过LLM检测）
+- 支持多种格式：TXT、PDF、DOCX、DOC、图片OCR
+- 文件大小限制：10MB
+- 文本长度限制：10000个字符
 
 ## 🚀 快速开始
 
@@ -319,10 +375,53 @@ docker compose up -d
 
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
-| `OLLAMA_BASE_URL` | `http://172.20.0.1:11434` | Ollama 服务地址 |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama 服务地址（Host模式） |
 | `OLLAMA_MODEL` | `qwen2.5:7b-instruct-q4_K_M` | 使用的 LLM 模型（推荐量化版本） |
 | `CORS_ALLOW_ORIGINS` | `*` | CORS 允许的源 |
 | `PYTHONUNBUFFERED` | `1` | Python 输出缓冲 |
+
+**网络配置说明**：
+- **Host模式**：容器使用宿主机网络，Ollama服务地址为 `localhost:11434`
+- **Bridge模式**：如需使用Bridge模式，请将 `OLLAMA_BASE_URL` 改为 `http://172.17.0.1:11434`
+
+### Docker网络配置
+
+#### Host模式（默认推荐）
+
+**配置**：
+```yaml
+network_mode: host
+environment:
+  - OLLAMA_BASE_URL=http://localhost:11434
+```
+
+**优势**：
+- ✅ Ollama连接稳定可靠
+- ✅ 网络配置简单
+- ✅ 适合本地开发环境
+
+**注意事项**：
+- ⚠️ 容器直接使用宿主机网络
+- ⚠️ 适合开发环境，生产环境需谨慎
+
+#### Bridge模式（可选）
+
+**配置**：
+```yaml
+ports:
+  - "8000:8000"
+environment:
+  - OLLAMA_BASE_URL=http://172.17.0.1:11434
+```
+
+**优势**：
+- ✅ 网络隔离性好
+- ✅ 适合生产环境
+- ✅ 安全性更高
+
+**注意事项**：
+- ⚠️ 需要确保Ollama服务可被Docker网关访问
+- ⚠️ 可能需要额外的网络配置
 
 ### 量化模型配置
 
@@ -383,17 +482,21 @@ services:
   sensitive-detector-backend:
     build: ./backend
     container_name: sensitive-detector
-    ports:
-      - "8000:8000"
+    network_mode: host  # 使用host网络模式，直接访问宿主机服务
     volumes:
       - ./frontend:/app/frontend
       - ./word_libraries:/app/word_libraries
       - ./detection_config.json:/app/detection_config.json
     environment:
-      - OLLAMA_BASE_URL=http://172.20.0.1:11434
+      - OLLAMA_BASE_URL=http://localhost:11434
       - OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
     restart: unless-stopped
 ```
+
+**网络配置说明**：
+- **Host模式**：容器直接使用宿主机网络，确保Ollama服务连接稳定
+- **端口访问**：前端仍通过 `http://localhost:8000` 访问
+- **Ollama连接**：使用 `http://localhost:11434` 连接本地Ollama服务
 
 ## 🚢 部署指南
 

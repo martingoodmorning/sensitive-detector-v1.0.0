@@ -38,15 +38,14 @@ services:
   sensitive-detector-backend:
     build: ./backend
     container_name: sensitive-detector
-    ports:
-      - "8000:8000"
+    network_mode: host  # 使用host网络模式，确保Ollama连接稳定
     volumes:
       - ./frontend:/app/frontend
       - ./word_libraries:/app/word_libraries
       - ./detection_config.json:/app/detection_config.json
     environment:
       - PYTHONUNBUFFERED=1
-      - OLLAMA_BASE_URL=http://172.20.0.1:11434
+      - OLLAMA_BASE_URL=http://localhost:11434
       - OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
       - CORS_ALLOW_ORIGINS=*
     restart: unless-stopped
@@ -56,9 +55,59 @@ services:
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| `OLLAMA_BASE_URL` | Ollama服务地址 | `http://172.20.0.1:11434` |
+| `OLLAMA_BASE_URL` | Ollama服务地址（Host模式） | `http://localhost:11434` |
 | `OLLAMA_MODEL` | 使用的模型 | `qwen2.5:7b-instruct-q4_K_M` |
 | `CORS_ALLOW_ORIGINS` | 跨域设置 | `*` |
+
+### 网络配置说明
+
+#### Host模式（默认推荐）
+
+**配置特点**：
+- 容器直接使用宿主机网络栈
+- Ollama服务地址为 `localhost:11434`
+- 前端访问地址仍为 `http://localhost:8000`
+
+**优势**：
+- ✅ Ollama连接稳定可靠
+- ✅ 网络配置简单
+- ✅ 适合本地开发环境
+
+**注意事项**：
+- ⚠️ 容器直接使用宿主机网络
+- ⚠️ 适合开发环境，生产环境需谨慎
+
+#### Bridge模式（可选）
+
+如需使用Bridge模式，请修改配置：
+
+```yaml
+services:
+  sensitive-detector-backend:
+    build: ./backend
+    container_name: sensitive-detector
+    ports:
+      - "8000:8000"  # 恢复端口映射
+    volumes:
+      - ./frontend:/app/frontend
+      - ./word_libraries:/app/word_libraries
+      - ./detection_config.json:/app/detection_config.json
+    environment:
+      - PYTHONUNBUFFERED=1
+      - OLLAMA_BASE_URL=http://172.17.0.1:11434  # 使用Docker网关IP
+      - OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
+      - CORS_ALLOW_ORIGINS=*
+    restart: unless-stopped
+```
+
+**优势**：
+- ✅ 网络隔离性好
+- ✅ 适合生产环境
+- ✅ 安全性更高
+
+**注意事项**：
+- ⚠️ 需要确保Ollama服务可被Docker网关访问
+- ⚠️ 可能需要额外的网络配置
 
 ## 🔧 系统依赖
 
@@ -232,15 +281,36 @@ docker compose exec sensitive-detector-backend tesseract --version
 docker compose exec sensitive-detector-backend tesseract --list-langs
 ```
 
-#### 3. 严格模式检测异常
+#### 3. 大模型检测功能异常
 
+**Host模式（推荐）**：
 ```bash
-# 检查Ollama连接
-curl http://172.20.0.1:11434/api/tags
+# 检查Ollama服务是否运行
+curl http://localhost:11434/api/tags
 
 # 检查模型是否加载
-curl http://172.20.0.1:11434/api/show -d '{"name": "qwen2.5:7b-instruct-q4_K_M"}'
+curl http://localhost:11434/api/show -d '{"name": "qwen2.5:7b-instruct-q4_K_M"}'
+
+# 检查容器日志
+docker compose logs sensitive-detector-backend | grep "Ollama"
 ```
+
+**Bridge模式**：
+```bash
+# 检查Docker网关IP
+docker network inspect bridge | grep Gateway
+
+# 检查Ollama连接
+curl http://172.17.0.1:11434/api/tags
+
+# 如果连接失败，尝试其他网关IP
+curl http://172.20.0.1:11434/api/tags
+```
+
+**常见解决方案**：
+1. **确保Ollama服务运行**：`ollama serve`
+2. **检查网络配置**：确认OLLAMA_BASE_URL设置正确
+3. **重启服务**：`docker compose restart`
 
 ### 日志分析
 
