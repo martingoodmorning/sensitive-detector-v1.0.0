@@ -10,7 +10,7 @@
 
 ```bash
 # 克隆项目
-git clone https://gitee.com/saisai5203/sensitive-detector-v1.0.0.git
+git clone https://github.com/martingoodmorning/sensitive-detector-v1.0.0.git
 cd sensitive-detector
 ```
 

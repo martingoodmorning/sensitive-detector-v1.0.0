@@ -2,7 +2,7 @@
 
 一个基于 FastAPI + Ollama 的智能敏感词检测系统，支持文本和文档检测，具备规则匹配和大语言模型双重检测能力。
 
-项目已上传 https://gitee.com/saisai5203/sensitive-detector-v1.0.0.git
+项目已上传 https://github.com/martingoodmorning/sensitive-detector-v1.0.0.git
 
 ## 📋 目录
 
@@ -196,7 +196,7 @@ graph TD
 
 ```bash
 # 1. 克隆项目
-git clone https://gitee.com/saisai5203/sensitive-detector-v1.0.0.git
+git clone https://github.com/martingoodmorning/sensitive-detector-v1.0.0.git
 cd sensitive-detector
 
 # 2. 启动 Ollama 服务
@@ -505,7 +505,7 @@ services:
 **一键部署**:
 ```bash
 # 1. 克隆项目
-git clone https://gitee.com/saisai5203/sensitive-detector-v1.0.0.git
+git clone https://github.com/martingoodmorning/sensitive-detector-v1.0.0.git
 cd sensitive-detector
 
 # 2. 启动 Ollama 服务
@@ -629,7 +629,7 @@ docker compose up -d
 
 - **项目维护者**: [xxx]
 - **邮箱**: [xxx]
-- **Gitee**: https://gitee.com/saisai5203/sensitive-detector-v1.0.0
+- **GitHub**: https://github.com/martingoodmorning/sensitive-detector-v1.0.0
 
 ### 贡献指南
 
