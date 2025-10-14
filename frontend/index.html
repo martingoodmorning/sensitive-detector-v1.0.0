@@ -166,6 +166,10 @@
                             <div class="result-value" id="doc-text-length"></div>
                         </div>
                         <div class="result-item">
+                            <div class="result-label">使用的词库</div>
+                            <div class="result-value" id="doc-used-libraries"></div>
+                        </div>
+                        <div class="result-item">
                             <div class="result-label">规则引擎检测</div>
                             <div class="result-value" id="doc-rule-detected"></div>
                         </div>
@@ -198,6 +202,20 @@
                         <div class="section-header">
                             <h3>使用词库列表</h3>
                             <p>选择要用于检测的词库，可以同时使用多个词库</p>
+                        </div>
+                        
+                        <!-- 当前词库状态指示器 -->
+                        <div class="library-status-indicator" id="library-status-indicator">
+                            <div class="status-item">
+                                <i class="fas fa-info-circle"></i>
+                                <span class="status-label">当前状态:</span>
+                                <span class="status-value" id="current-library-status">加载中...</span>
+                            </div>
+                            <div class="status-item">
+                                <i class="fas fa-clock"></i>
+                                <span class="status-label">最后更新:</span>
+                                <span class="status-value" id="last-update-time">-</span>
+                            </div>
                         </div>
                         <div class="used-libraries-list" id="used-libraries-list">
                             <!-- 使用词库列表将在这里动态生成 -->

@@ -184,7 +184,7 @@ def get_ocr_config():
     return {
         'lang': 'chi_sim+eng',  # 支持中文简体和英文
         'config': '--psm 6 --oem 3',  # PSM 6: 统一文本块, OEM 3: 默认引擎
-        'char_whitelist': '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz一二三四五六七八九十百千万亿零壹贰叁肆伍陆柒捌玖拾佰仟萬億'
+        'char_whitelist': None  # 移除字符白名单限制，允许识别所有字符
     }
 
 # 初始化敏感词库管理器
@@ -224,9 +224,21 @@ class DetectionLibraryManager:
             }
             with open(self.config_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
+            # 更新内存中的配置
+            self.config = config
             print(f"检测配置已保存: 使用 {len(used_libraries)} 个词库，共 {word_count} 个敏感词")
         except Exception as e:
             print(f"保存检测配置失败: {e}")
+    
+    def reload_config(self):
+        """重新加载配置文件"""
+        print(f"开始重新加载配置文件: {self.config_path}")
+        old_config = self.config.copy() if self.config else {}
+        self.config = self.load_config()
+        print(f"重新加载检测配置完成:")
+        print(f"  旧配置: {old_config}")
+        print(f"  新配置: {self.config}")
+        print(f"  配置文件是否存在: {os.path.exists(self.config_path)}")
     
     def get_used_libraries(self):
         """获取当前使用的词库列表"""
@@ -867,17 +879,36 @@ async def update_detection_libraries(req: dict):
 @app.get("/detection-libraries/status", summary="获取检测词库状态")
 async def get_detection_libraries_status():
     """获取当前检测词库状态"""
-    used_libraries = detection_lib_manager.get_used_libraries()
-    word_count = detection_lib_manager.get_word_count()
+    print("=== API调用: 获取检测词库状态 ===")
     
-    return {
-        "status": "success",
-        "data": {
-            "used_libraries": used_libraries,
-            "word_count": word_count,
-            "last_updated": detection_lib_manager.config.get("last_updated")
+    # 强制重新加载配置文件
+    try:
+        with open("/app/detection_config.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+        print(f"直接从文件读取配置: {config}")
+        
+        used_libraries = config.get("used_libraries", [])
+        word_count = config.get("word_count", 0)
+        last_updated = config.get("last_updated")
+        
+        print(f"返回的词库: {used_libraries}")
+        print(f"返回的词库数量: {len(used_libraries)}")
+        print("=== API调用结束 ===")
+        
+        return {
+            "status": "success",
+            "data": {
+                "used_libraries": used_libraries,
+                "word_count": word_count,
+                "last_updated": last_updated
+            }
         }
-    }
+    except Exception as e:
+        print(f"读取配置文件失败: {e}")
+        return {
+            "status": "error",
+            "message": f"读取配置文件失败: {str(e)}"
+        }
 
 # ---------------------- 核心API：文本检测 ----------------------
 @app.post("/detect/text", summary="文本敏感词检测")
@@ -1103,8 +1134,11 @@ async def detect_document(file: UploadFile = File(...)):
                 # 获取OCR配置
                 ocr_config = get_ocr_config()
                 
-                # 构建完整的OCR配置字符串
-                full_config = f"{ocr_config['config']} -c tessedit_char_whitelist={ocr_config['char_whitelist']}"
+                # 构建OCR配置字符串
+                if ocr_config['char_whitelist']:
+                    full_config = f"{ocr_config['config']} -c tessedit_char_whitelist={ocr_config['char_whitelist']}"
+                else:
+                    full_config = ocr_config['config']
                 
                 # 执行OCR识别
                 text = pytesseract.image_to_string(
@@ -1116,6 +1150,10 @@ async def detect_document(file: UploadFile = File(...)):
                 # 清理识别结果
                 text = text.strip()
                 
+                # 添加OCR识别结果调试信息
+                print(f"OCR识别结果: '{text}'")
+                print(f"OCR识别结果长度: {len(text)}")
+                
                 # 如果识别结果为空，尝试使用更宽松的配置
                 if not text.strip():
                     print("使用宽松配置重新尝试OCR识别...")
@@ -1124,6 +1162,7 @@ async def detect_document(file: UploadFile = File(...)):
                         lang=ocr_config['lang'], 
                         config='--psm 3 --oem 3'  # 更宽松的配置
                     ).strip()
+                    print(f"宽松配置OCR识别结果: '{text}'")
                 
             except Exception as ocr_error:
                 raise HTTPException(
@@ -1137,9 +1176,14 @@ async def detect_document(file: UploadFile = File(...)):
     if not text.strip():
         raise HTTPException(status_code=400, detail="文档内容为空或无法提取文本")
 
-    # 4. 文档检测默认使用严格模式（直接使用大模型检测）
+    # 4. 文档检测：文本预处理 + 严格模式（直接使用大模型检测）
+    # 4.1 文本预处理（归一化字符格式）
+    preprocessor = TextPreprocessor()
+    normalized_text = preprocessor.preprocess_text(text)
+    
+    # 4.2 使用预处理后的文本进行LLM检测
     llm_start = time.time()
-    llm_result = call_ollama_api(text)
+    llm_result = call_ollama_api(normalized_text)
     llm_time = time.time() - llm_start
     # 容错：若模型输出异常，默认按"正常"处理
     llm_result = llm_result if llm_result in ["敏感", "正常"] else "正常"
@@ -1159,13 +1203,13 @@ async def detect_document(file: UploadFile = File(...)):
                 "all_results": [],
                 "suspicious_segments": [],
                 "word_count": 0,
-                "normalized_text": "",
+                "normalized_text": normalized_text,  # 归一化后的文本
                 "timing": {"preprocess_time": 0, "ac_time": 0, "dfa_time": 0, "total_time": 0}
             },
             "llm_detected": llm_result,
             "llm_time": round(llm_time * 1000, 2),  # 大模型检测用时（毫秒）
             "final_result": final_result,
-            "detection_flow": "strict_mode"  # 文档检测默认使用严格模式
+            "detection_flow": "strict_mode"  # 文档检测使用严格模式（预处理+LLM）
         }
     }
 

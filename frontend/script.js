@@ -516,9 +516,8 @@ async function initializeLibraryManagement() {
     console.log('初始化词库管理...');
     try {
         await loadLibraries();
-        await loadDetectionLibrariesStatus();
+        await loadDetectionLibrariesStatus(); // 这个函数内部会调用 renderUsedLibrariesList()
         setupLibraryEventListeners();
-        renderUsedLibrariesList();
         console.log('词库管理初始化完成');
     } catch (error) {
         console.error('词库管理初始化失败:', error);
@@ -543,16 +542,30 @@ async function loadLibraries() {
 
 // 加载检测词库状态
 async function loadDetectionLibrariesStatus() {
+    console.log('🚀 开始加载检测词库状态...');
     try {
         const response = await fetch(`${API_BASE_URL}/detection-libraries/status`);
+        console.log('📡 API响应状态:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const result = await response.json();
+        console.log('📦 API响应数据:', result);
         
         if (result.status === 'success') {
             usedLibraries = result.data.used_libraries || [];
-            console.log('加载检测词库状态:', usedLibraries);
+            console.log('✅ 成功加载检测词库状态:', usedLibraries);
+            console.log('📊 词库数量:', usedLibraries.length);
+            console.log('🎨 开始更新UI...');
+            renderUsedLibrariesList(); // 更新UI显示
+            console.log('✨ UI已更新完成');
+        } else {
+            console.error('❌ API返回错误状态:', result);
         }
     } catch (error) {
-        console.error('加载检测词库状态失败:', error);
+        console.error('💥 加载检测词库状态失败:', error);
     }
 }
 
@@ -596,26 +609,53 @@ function renderLibrariesTable() {
 
 // 渲染使用词库列表
 function renderUsedLibrariesList() {
+    console.log('🎯 开始渲染使用词库列表，当前词库:', usedLibraries);
     usedLibrariesList.innerHTML = '';
     
     if (usedLibraries.length === 0) {
         usedLibrariesCount.textContent = '当前使用 0 个词库';
-        return;
+        console.log('无词库，显示默认状态');
+    } else {
+        usedLibraries.forEach(libraryName => {
+            const libraryItem = document.createElement('div');
+            libraryItem.className = 'used-library-item';
+            libraryItem.innerHTML = `
+                <span>${libraryName}</span>
+                <button class="remove-btn" onclick="removeFromUsedLibraries('${libraryName}')" title="移除">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            usedLibrariesList.appendChild(libraryItem);
+        });
+        
+        usedLibrariesCount.textContent = `已选择 ${usedLibraries.length} 个词库`;
+        console.log('已渲染', usedLibraries.length, '个词库');
     }
     
-    usedLibraries.forEach(libraryName => {
-        const libraryItem = document.createElement('div');
-        libraryItem.className = 'used-library-item';
-        libraryItem.innerHTML = `
-            <span>${libraryName}</span>
-            <button class="remove-btn" onclick="removeFromUsedLibraries('${libraryName}')" title="移除">
-                <i class="fas fa-times"></i>
-            </button>
-        `;
-        usedLibrariesList.appendChild(libraryItem);
-    });
+    // 更新状态指示器
+    const currentLibraryStatus = document.getElementById('current-library-status');
+    if (currentLibraryStatus) {
+        if (usedLibraries.length === 0) {
+            currentLibraryStatus.textContent = '使用默认词库';
+            currentLibraryStatus.className = 'status-value status-default';
+            console.log('状态指示器更新为: 使用默认词库');
+        } else {
+            currentLibraryStatus.textContent = `使用 ${usedLibraries.length} 个自定义词库`;
+            currentLibraryStatus.className = 'status-value status-custom';
+            console.log('状态指示器更新为: 使用', usedLibraries.length, '个自定义词库');
+        }
+    } else {
+        console.error('找不到状态指示器元素 current-library-status');
+    }
     
-    usedLibrariesCount.textContent = `已选择 ${usedLibraries.length} 个词库`;
+    // 更新最后更新时间
+    const lastUpdateTime = document.getElementById('last-update-time');
+    if (lastUpdateTime) {
+        lastUpdateTime.textContent = new Date().toLocaleString('zh-CN');
+        console.log('更新时间已设置');
+    } else {
+        console.error('找不到更新时间元素 last-update-time');
+    }
 }
 
 // 添加到使用词库列表

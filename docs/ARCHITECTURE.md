@@ -1,1328 +1,577 @@
-# 系统架构设计文档
+# 系统架构文档
 
-## 概述
+## 🏗️ 架构概述
 
-敏感词检测系统采用现代化的微服务架构，结合传统算法和人工智能技术，为用户提供高效、准确的内容安全检测服务。系统设计遵循高可用、高性能、可扩展的原则。
+敏感词检测系统采用现代化的微服务架构，结合传统规则匹配和先进的大语言模型技术，为用户提供准确、可靠的敏感内容识别服务。
 
-## 整体架构
+## 🎯 设计原则
 
-### 架构图
+### 核心原则
 
-```mermaid
-graph TB
-    subgraph "用户层"
-        U1[Web 浏览器]
-        U2[移动端]
-        U3[API 客户端]
-    end
-    
-    subgraph "接入层"
-        LB[负载均衡器]
-        CDN[CDN 加速]
-    end
-    
-    subgraph "应用层"
-        FE[前端应用]
-        API[API 网关]
-        AUTH[认证服务]
-    end
-    
-    subgraph "服务层"
-        TEXT[文本检测服务]
-        DOC[文档检测服务]
-        RULE[规则匹配服务]
-        LLM[LLM 检测服务]
-    end
-    
-    subgraph "数据层"
-        CACHE[Redis 缓存]
-        DB[数据库]
-        FS[文件存储]
-    end
-    
-    subgraph "基础设施层"
-        DOCKER[Docker 容器]
-        K8S[Kubernetes]
-        MONITOR[监控系统]
-    end
-    
-    U1 --> LB
-    U2 --> LB
-    U3 --> LB
-    LB --> CDN
-    CDN --> FE
-    CDN --> API
-    API --> AUTH
-    API --> TEXT
-    API --> DOC
-    TEXT --> RULE
-    TEXT --> LLM
-    DOC --> RULE
-    DOC --> LLM
-    RULE --> CACHE
-    LLM --> CACHE
-    TEXT --> DB
-    DOC --> DB
-    DOC --> FS
+1. **双重检测**: 规则匹配快速筛选 + LLM 智能检测
+2. **高性能**: 毫秒级响应时间，支持高并发
+3. **可扩展**: 容器化部署，支持水平扩展
+4. **可维护**: 模块化设计，易于维护和升级
+5. **高可用**: 健康检查，自动重启，故障恢复
+
+### 技术原则
+
+- **容器化**: 使用 Docker 实现环境一致性
+- **微服务**: 服务分离，独立部署
+- **API 优先**: RESTful API 设计
+- **数据持久化**: 模型和配置数据持久化存储
+- **监控友好**: 完善的日志和监控机制
+
+## 🏛️ 系统架构
+
+### 整体架构图
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        用户层                                   │
+├─────────────────────────────────────────────────────────────────┤
+│  Web 界面          │  API 客户端      │  第三方集成              │
+│  (HTML/CSS/JS)     │  (SDK/CLI)      │  (Webhook/Callback)     │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        接入层                                   │
+├─────────────────────────────────────────────────────────────────┤
+│  Nginx (可选)      │  Load Balancer  │  API Gateway (可选)      │
+│  反向代理          │  负载均衡        │  网关服务                │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        应用层                                   │
+├─────────────────────────────────────────────────────────────────┤
+│  FastAPI 应用      │  规则匹配引擎    │  文档解析服务            │
+│  - 路由处理        │  - AC自动机      │  - PDF解析              │
+│  - 请求验证        │  - DFA算法       │  - DOCX解析             │
+│  - 响应格式化      │  - 文本预处理    │  - OCR识别              │
+│  - 错误处理        │  - 结果合并      │  - 格式转换             │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        AI 服务层                               │
+├─────────────────────────────────────────────────────────────────┤
+│  Ollama 服务       │  Qwen 模型      │  模型管理                │
+│  - 模型加载        │  - 7B 参数      │  - 模型下载              │
+│  - 推理服务        │  - INT4 量化    │  - 模型预热              │
+│  - API 接口        │  - 中文优化     │  - 版本管理              │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        数据层                                   │
+├─────────────────────────────────────────────────────────────────┤
+│  词库存储          │  模型存储        │  配置存储                │
+│  - 敏感词库        │  - 模型文件      │  - 检测配置              │
+│  - 规则配置        │  - 权重文件      │  - 系统配置              │
+│  - 用户词库        │  - 缓存数据      │  - 日志配置              │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 技术栈
+### 服务架构图
 
-| 层级 | 技术选型 | 说明 |
-|------|----------|------|
-| 前端 | HTML5/CSS3/JavaScript | 原生技术栈 |
-| 后端 | FastAPI/Python 3.10 | 现代化 Web 框架 |
-| AI 服务 | Ollama/Qwen:7b | 本地 LLM 部署 |
-| 容器化 | Docker/Docker Compose | 容器编排（Host网络模式） |
-| 反向代理 | Nginx | 负载均衡和 SSL |
-| 监控 | Prometheus/Grafana | 系统监控 |
-| 日志 | ELK Stack | 日志分析 |
-
-### 网络架构
-
-#### Docker网络配置
-
-**Host模式（默认推荐）**：
-```yaml
-services:
-  sensitive-detector-backend:
-    network_mode: host  # 使用宿主机网络
-    environment:
-      - OLLAMA_BASE_URL=http://localhost:11434
-```
-
-**网络架构图**：
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Windows浏览器  │    │   WSL宿主机     │    │   Docker容器    │
-│                 │    │                 │    │                 │
-│ http://localhost│◄──►│ localhost:8000  │◄──►│ FastAPI服务     │
-│ :8000           │    │ localhost:11434 │◄──►│ Ollama服务      │
+│   Ollama 容器    │    │   应用容器       │    │   数据存储      │
+│   ollama-service │────│sensitive-detector│────│   Volumes       │
+│   ~1GB 镜像     │    │   ~500MB 镜像   │    │   ~5GB 数据     │
+│   8GB 内存限制   │    │   2GB 内存限制   │    │   持久化存储     │
+│   4 核心 CPU    │    │   1 核心 CPU    │    │   自动备份       │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    ┌─────────────────┐
+                    │   网络层        │
+                    │   Bridge 网络   │
+                    │   端口映射      │
+                    │   服务发现      │
+                    └─────────────────┘
 ```
 
-**优势**：
-- ✅ Ollama连接稳定可靠
-- ✅ 网络配置简单
-- ✅ 适合本地开发环境
-- ✅ 减少网络转发层
+## 🔧 核心组件
 
-**注意事项**：
-- ⚠️ 容器直接使用宿主机网络
-- ⚠️ 适合开发环境，生产环境需谨慎
+### 1. 应用服务 (FastAPI)
 
-#### Bridge模式（可选）
+#### 功能模块
 
-**配置**：
-```yaml
-services:
-  sensitive-detector-backend:
-    ports:
-      - "8000:8000"
-    environment:
-      - OLLAMA_BASE_URL=http://172.17.0.1:11434
+```
+FastAPI 应用
+├── 路由模块
+│   ├── 文本检测路由 (/detect/text)
+│   ├── 文档检测路由 (/detect/document)
+│   ├── 词库管理路由 (/word-libraries/*)
+│   └── 健康检查路由 (/health)
+├── 业务逻辑模块
+│   ├── 检测服务 (DetectionService)
+│   ├── 规则匹配服务 (RuleMatchingService)
+│   ├── 文档解析服务 (DocumentParsingService)
+│   └── 词库管理服务 (WordLibraryService)
+├── 数据模型模块
+│   ├── 请求模型 (Request Models)
+│   ├── 响应模型 (Response Models)
+│   └── 错误模型 (Error Models)
+└── 工具模块
+    ├── 文本预处理工具
+    ├── 文件处理工具
+    └── 日志工具
 ```
 
-**网络架构图**：
+#### 技术栈
+
+- **Web 框架**: FastAPI
+- **ASGI 服务器**: Uvicorn
+- **数据验证**: Pydantic
+- **文档解析**: PyPDF2, python-docx, antiword
+- **OCR 识别**: pytesseract, Tesseract OCR
+- **文本处理**: 正则表达式, AC自动机, DFA
+
+### 2. AI 服务 (Ollama)
+
+#### 功能模块
+
+```
+Ollama 服务
+├── 模型管理
+│   ├── 模型下载 (ollama pull)
+│   ├── 模型加载 (ollama load)
+│   ├── 模型列表 (ollama list)
+│   └── 模型删除 (ollama rm)
+├── 推理服务
+│   ├── 文本生成 (ollama generate)
+│   ├── 对话接口 (ollama chat)
+│   └── 嵌入向量 (ollama embeddings)
+├── API 服务
+│   ├── RESTful API
+│   ├── WebSocket 支持
+│   └── 流式响应
+└── 系统管理
+    ├── 服务启动 (ollama serve)
+    ├── 配置管理
+    └── 日志管理
+```
+
+#### 技术栈
+
+- **运行环境**: Ollama
+- **模型**: Qwen2.5:7b-instruct-q4_K_M
+- **量化**: INT4 量化
+- **推理引擎**: GGML/GGUF
+- **API**: RESTful + WebSocket
+
+### 3. 规则匹配引擎
+
+#### 算法架构
+
+```
+规则匹配引擎
+├── 文本预处理
+│   ├── 字符归一化
+│   ├── 变体统一
+│   ├── 标点符号处理
+│   └── 大小写转换
+├── AC自动机
+│   ├── 模式串构建
+│   ├── 失败指针计算
+│   ├── 多模式匹配
+│   └── 可疑片段提取
+├── DFA算法
+│   ├── 状态转换表
+│   ├── 精确匹配
+│   ├── 边界处理
+│   └── 结果验证
+└── 结果处理
+    ├── 去重合并
+    ├── 位置标记
+    ├── 置信度计算
+    └── 结果排序
+```
+
+#### 性能特点
+
+- **时间复杂度**: O(n + m) (n为文本长度，m为模式串总长度)
+- **空间复杂度**: O(Σ) (Σ为字符集大小)
+- **匹配速度**: 5ms/1000字符
+- **准确率**: 99.5%+
+
+### 4. 文档解析服务
+
+#### 支持格式
+
+```
+文档解析服务
+├── 文本文件
+│   ├── TXT (UTF-8编码)
+│   └── 其他文本格式
+├── PDF 文档
+│   ├── PyPDF2 解析
+│   ├── 文本提取
+│   ├── 页面处理
+│   └── 编码转换
+├── Word 文档
+│   ├── DOCX (python-docx)
+│   ├── DOC (antiword)
+│   ├── 段落提取
+│   └── 格式处理
+└── 图片文件
+    ├── OCR 识别 (Tesseract)
+    ├── 多语言支持
+    ├── 图像预处理
+    └── 文本后处理
+```
+
+#### 技术实现
+
+- **PDF**: PyPDF2 + 编码检测
+- **DOCX**: python-docx + XML解析
+- **DOC**: antiword + 系统调用
+- **OCR**: pytesseract + Tesseract OCR
+- **图像处理**: PIL + OpenCV
+
+## 🔄 数据流架构
+
+### 文本检测流程
+
+```mermaid
+graph TD
+    A[用户输入文本] --> B[请求验证]
+    B --> C{检测模式}
+    C -->|严格模式| D[直接LLM检测]
+    C -->|普通模式| E[规则匹配检测]
+    E --> F{规则匹配结果}
+    F -->|发现敏感词| G[LLM智能检测]
+    F -->|未发现敏感词| H[返回正常结果]
+    G --> I[LLM检测结果]
+    D --> I
+    I --> J[结果合并]
+    J --> K[响应格式化]
+    K --> L[返回最终结果]
+    H --> K
+```
+
+### 文档检测流程
+
+```mermaid
+graph TD
+    A[用户上传文档] --> B[文件验证]
+    B --> C{文件类型}
+    C -->|TXT| D[直接读取文本]
+    C -->|PDF| E[PyPDF2解析]
+    C -->|DOCX| F[python-docx解析]
+    C -->|DOC| G[antiword工具解析]
+    C -->|图片| H[OCR文字识别]
+    D --> I[提取文本内容]
+    E --> I
+    F --> I
+    G --> I
+    H --> I
+    I --> J{文本是否为空}
+    J -->|是| K[返回错误]
+    J -->|否| L[严格模式LLM检测]
+    L --> M[检测结果]
+    M --> N[响应格式化]
+    N --> O[返回检测结果]
+```
+
+### 规则匹配详细流程
+
+```mermaid
+graph TD
+    A[输入文本] --> B[文本预处理]
+    B --> C[字符归一化]
+    C --> D[AC自动机初筛]
+    D --> E[可疑片段提取]
+    E --> F[DFA精确匹配]
+    F --> G[结果合并]
+    G --> H[置信度计算]
+    H --> I[返回匹配结果]
+```
+
+## 🌐 网络架构
+
+### 容器网络
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Docker 网络                              │
+├─────────────────────────────────────────────────────────────────┤
+│  Bridge 网络 (sensitive-detector_default)                      │
+│  ├── ollama-service (172.20.0.2:11434)                        │
+│  ├── sensitive-detector (172.20.0.3:8000)                     │
+│  └── 网络隔离，内部通信                                         │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        端口映射                                │
+├─────────────────────────────────────────────────────────────────┤
+│  宿主机端口          │  容器端口          │  服务                │
+│  8000               │  8000             │  FastAPI 应用        │
+│  11434              │  11434            │  Ollama 服务         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 服务通信
+
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Windows浏览器  │    │   WSL宿主机     │    │   Docker网络    │
-│                 │    │                 │    │                 │
-│ http://localhost│◄──►│ localhost:8000  │◄──►│ 172.17.0.2:8000 │
-│ :8000           │    │ localhost:11434 │◄──►│ 172.17.0.1:11434│
+│   用户请求       │    │   应用服务       │    │   Ollama 服务   │
+│   HTTP/HTTPS    │───►│   FastAPI       │───►│   RESTful API   │
+│   Port: 8000    │    │   Port: 8000    │    │   Port: 11434   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │                       │
+                                ▼                       ▼
+                    ┌─────────────────┐    ┌─────────────────┐
+                    │   规则匹配       │    │   模型推理       │
+                    │   本地处理       │    │   LLM 推理      │
+                    └─────────────────┘    └─────────────────┘
 ```
 
-**优势**：
-- ✅ 网络隔离性好
-- ✅ 适合生产环境
-- ✅ 安全性更高
+## 💾 数据架构
 
-**注意事项**：
-- ⚠️ 需要确保Ollama服务可被Docker网关访问
-- ⚠️ 可能需要额外的网络配置
+### 存储结构
 
-## 核心组件
-
-### 1. 前端应用
-
-**架构特点**:
-- 单页应用 (SPA)
-- 响应式设计
-- 组件化开发
-- 现代化 UI/UX
-
-**技术实现**:
-```javascript
-// 模块化架构
-const App = {
-    // 配置模块
-    config: {
-        API_BASE_URL: 'http://localhost:8000',
-        TIMEOUT: 30000
-    },
-    
-    // 服务模块
-    services: {
-        textDetection: new TextDetectionService(),
-        documentDetection: new DocumentDetectionService()
-    },
-    
-    // 组件模块
-    components: {
-        textPanel: new TextPanel(),
-        documentPanel: new DocumentPanel(),
-        notification: new Notification()
-    },
-    
-    // 工具模块
-    utils: {
-        formatFileSize: (bytes) => { /* ... */ },
-        showNotification: (message, type) => { /* ... */ }
-    }
-};
+```
+数据存储
+├── 模型数据 (./data/ollama/)
+│   ├── models/
+│   │   ├── qwen2.5:7b-instruct-q4_K_M/
+│   │   │   ├── model.gguf (4.1GB)
+│   │   │   ├── tokenizer.json
+│   │   │   └── config.json
+│   │   └── 其他模型...
+│   ├── blobs/
+│   └── manifests/
+├── 词库数据 (./word_libraries/)
+│   ├── 政治敏感词.txt
+│   ├── 暴力词汇.txt
+│   ├── 色情词汇.txt
+│   └── 其他词库...
+├── 配置文件 (./detection_config.json)
+│   ├── 检测配置
+│   ├── 模型配置
+│   └── 系统配置
+└── 日志文件
+    ├── 应用日志
+    ├── Ollama 日志
+    └── 系统日志
 ```
 
-**设计模式**:
-- 观察者模式: 事件监听和通知
-- 策略模式: 不同检测策略
-- 工厂模式: 组件创建
-- 单例模式: 全局配置
+### 数据持久化
 
-### 2. 后端 API 服务
-
-**架构特点**:
-- RESTful API 设计
-- 异步处理
-- 中间件支持
-- 自动文档生成
-
-**技术实现**:
-```python
-# 分层架构
-class Application:
-    def __init__(self):
-        self.app = FastAPI()
-        self.setup_middleware()
-        self.setup_routes()
-        self.setup_services()
-    
-    def setup_middleware(self):
-        # CORS 中间件
-        self.app.add_middleware(CORSMiddleware, ...)
-        
-        # 请求限流中间件
-        self.app.add_middleware(RateLimitMiddleware, ...)
-        
-        # 日志中间件
-        self.app.add_middleware(LoggingMiddleware, ...)
-    
-    def setup_routes(self):
-        # API 路由
-        self.app.include_router(text_router, prefix="/api/v1")
-        self.app.include_router(document_router, prefix="/api/v1")
-        self.app.include_router(health_router, prefix="/api/v1")
-    
-    def setup_services(self):
-        # 服务依赖注入
-        self.text_service = TextDetectionService()
-        self.document_service = DocumentDetectionService()
-        self.llm_service = LLMDetectionService()
-```
-
-**设计模式**:
-- 依赖注入: 服务解耦
-- 工厂模式: 服务创建
-- 策略模式: 检测算法
-- 装饰器模式: 中间件和路由
-
-### 3. 检测算法服务
-
-**规则匹配算法**:
-```python
-class TextPreprocessor:
-    def __init__(self):
-        """文本预处理器，用于统一字符格式，消除无意义变体"""
-        self.setup_normalization_rules()
-    
-    def normalize_text(self, text):
-        """文本归一化处理"""
-        # 1. 全角转半角
-        # 2. 繁体转简体  
-        # 3. 移除特殊符号
-        return normalized_text
-
-class ACAutomaton:
-    def __init__(self, words):
-        """AC自动机，用于多模式字符串匹配"""
-        self.build_automaton(words)
-    
-    def search(self, text):
-        """搜索匹配的敏感词"""
-        return results, suspicious_segments
-
-class DFAFilter:
-    def __init__(self, words):
-        """DFA过滤器，用于精确验证"""
-        self.build_dfa(words)
-    
-    def precise_match(self, text, segments):
-        """精确匹配验证"""
-        return results
-
-class ThreeStepFilter:
-    def __init__(self, word_paths):
-        self.text_preprocessor = TextPreprocessor()
-        self.ac_automaton = ACAutomaton(words)
-        self.dfa_filter = DFAFilter(words)
-    
-    def detect(self, text):
-        """规则匹配检测（预处理+AC+DFA）"""
-        # 1. 文本预处理
-        normalized_text = self.text_preprocessor.preprocess_text(text)
-        # 2. AC自动机匹配
-        ac_results, suspicious_segments = self.ac_automaton.search(normalized_text)
-        # 3. DFA精确验证
-        dfa_results = self.dfa_filter.precise_match(text, suspicious_segments)
-        # 4. 合并结果
-        return combined_results
-```
-
-**LLM 检测算法**:
-```python
-class LLMDetectionService:
-    def __init__(self, base_url: str, model: str):
-        self.base_url = base_url
-        self.model = model
-        self.session = requests.Session()
-    
-    async def detect(self, text: str) -> str:
-        """LLM 智能检测"""
-        prompt = self.build_prompt(text)
-        
-        try:
-            response = await self.session.post(
-                f"{self.base_url}/api/generate",
-                json={
-                    "model": self.model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": 0
-                },
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return self.parse_response(result.get("response", ""))
-            else:
-                return "正常"
-                
-        except Exception as e:
-            logger.error(f"LLM 检测失败: {e}")
-            return "正常"
-    
-    def build_prompt(self, text: str) -> str:
-        """构建检测提示词"""
-        return f"""
-        你是专业的内容安全检测系统。请严格按照以下规则进行判断：
-
-        【敏感内容标准】
-        必须同时满足以下条件才判定为敏感：
-        1. 包含明确的辱骂词汇
-        2. 包含暴力威胁
-        3. 包含违法内容
-        4. 包含色情内容
-        5. 包含歧视内容
-
-        【检测文本】
-        {text[:500]}
-
-        【判断规则】
-        - 如果文本明显包含上述任何一类敏感内容，回答：敏感
-        - 如果文本是正常的日常对话、描述、询问等，回答：正常
-        - 对于模糊边界的内容，倾向于判定为正常
-
-        【输出要求】
-        请严格按照以下格式输出，不要添加任何其他内容：
-        敏感
-        或
-        正常
-        """
-```
-
-### 4. 文档处理服务
-
-**文档解析架构**:
-```python
-class DocumentProcessor:
-    def __init__(self):
-        self.parsers = {
-            'text/plain': self.parse_text,
-            'application/pdf': self.parse_pdf,
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': self.parse_docx
-        }
-    
-    def process(self, file: UploadFile) -> str:
-        """文档处理入口"""
-        content_type = file.content_type
-        
-        if content_type not in self.parsers:
-            raise UnsupportedFileTypeError(f"不支持的文件类型: {content_type}")
-        
-        return self.parsers[content_type](file)
-    
-    def parse_text(self, file: UploadFile) -> str:
-        """解析纯文本文件"""
-        content = file.file.read()
-        return content.decode("utf-8")
-    
-    def parse_pdf(self, file: UploadFile) -> str:
-        """解析 PDF 文件"""
-        content = file.file.read()
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
-        
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text()
-        
-        return text
-    
-    def parse_docx(self, file: UploadFile) -> str:
-        """解析 DOCX 文件"""
-        content = file.file.read()
-        doc = Document(io.BytesIO(content))
-        
-        text = ""
-        for paragraph in doc.paragraphs:
-            text += paragraph.text + "\n"
-        
-        return text
-```
-
-## 数据流设计
-
-### 1. 文本检测流程
-
-```mermaid
-sequenceDiagram
-    participant U as 用户
-    participant F as 前端
-    participant A as API网关
-    participant T as 文本服务
-    participant R as 规则引擎
-    participant L as LLM服务
-    participant C as 缓存
-    
-    U->>F: 输入文本
-    F->>A: POST /detect/text
-    A->>T: 转发请求
-    T->>R: 规则匹配检测
-    R->>C: 查询缓存
-    C-->>R: 返回结果
-    R-->>T: 规则检测结果
-    T->>L: LLM智能检测
-    L-->>T: LLM检测结果
-    T->>T: 结果整合
-    T-->>A: 返回结果
-    A-->>F: 返回响应
-    F-->>U: 显示结果
-```
-
-### 2. 文档检测流程
-
-```mermaid
-sequenceDiagram
-    participant U as 用户
-    participant F as 前端
-    participant A as API网关
-    participant D as 文档服务
-    participant P as 文档解析器
-    participant T as 文本服务
-    participant R as 规则引擎
-    participant L as LLM服务
-    
-    U->>F: 上传文档
-    F->>A: POST /detect/document
-    A->>D: 转发请求
-    D->>P: 解析文档
-    P-->>D: 提取文本
-    D->>T: 文本检测
-    T->>R: 规则匹配检测
-    R-->>T: 规则检测结果
-    T->>L: LLM智能检测
-    L-->>T: LLM检测结果
-    T-->>D: 检测结果
-    D-->>A: 返回结果
-    A-->>F: 返回响应
-    F-->>U: 显示结果
-```
-
-## 性能设计
-
-### 1. 缓存策略
-
-**多级缓存架构**:
-```python
-class CacheManager:
-    def __init__(self):
-        self.redis_client = redis.Redis(host='localhost', port=6379, db=0)
-        self.local_cache = {}
-        self.cache_ttl = 3600  # 1小时
-    
-    async def get(self, key: str) -> Optional[str]:
-        # L1: 本地缓存
-        if key in self.local_cache:
-            return self.local_cache[key]
-        
-        # L2: Redis 缓存
-        value = self.redis_client.get(key)
-        if value:
-            self.local_cache[key] = value
-            return value.decode('utf-8')
-        
-        return None
-    
-    async def set(self, key: str, value: str, ttl: int = None):
-        ttl = ttl or self.cache_ttl
-        
-        # 设置本地缓存
-        self.local_cache[key] = value
-        
-        # 设置 Redis 缓存
-        self.redis_client.setex(key, ttl, value)
-    
-    async def delete(self, key: str):
-        # 删除本地缓存
-        if key in self.local_cache:
-            del self.local_cache[key]
-        
-        # 删除 Redis 缓存
-        self.redis_client.delete(key)
-```
-
-**缓存策略**:
-- **热点数据**: 本地缓存 + Redis
-- **温数据**: Redis 缓存
-- **冷数据**: 数据库存储
-- **缓存更新**: 写时更新 + 定时刷新
-
-### 2. 并发处理
-
-**异步处理架构**:
-```python
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-
-class AsyncProcessor:
-    def __init__(self, max_workers: int = 4):
-        self.executor = ThreadPoolExecutor(max_workers=max_workers)
-        self.semaphore = asyncio.Semaphore(100)  # 限制并发数
-    
-    async def process_batch(self, tasks: List[Task]) -> List[Result]:
-        """批量异步处理"""
-        async with self.semaphore:
-            futures = [self.process_single(task) for task in tasks]
-            results = await asyncio.gather(*futures, return_exceptions=True)
-            return results
-    
-    async def process_single(self, task: Task) -> Result:
-        """单个任务处理"""
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            self.executor, 
-            self.sync_process, 
-            task
-        )
-    
-    def sync_process(self, task: Task) -> Result:
-        """同步处理逻辑"""
-        # 实际的检测逻辑
-        pass
-```
-
-**连接池管理**:
-```python
-import aiohttp
-from aiohttp import ClientSession, TCPConnector
-
-class ConnectionPool:
-    def __init__(self, max_connections: int = 100):
-        self.connector = TCPConnector(
-            limit=max_connections,
-            limit_per_host=30,
-            ttl_dns_cache=300,
-            use_dns_cache=True
-        )
-        self.session = None
-    
-    async def get_session(self) -> ClientSession:
-        if self.session is None or self.session.closed:
-            self.session = ClientSession(connector=self.connector)
-        return self.session
-    
-    async def close(self):
-        if self.session and not self.session.closed:
-            await self.session.close()
-```
-
-### 3. 负载均衡
-
-**Nginx 配置**:
-```nginx
-upstream backend {
-    least_conn;  # 最少连接算法
-    server 127.0.0.1:8001 weight=3;
-    server 127.0.0.1:8002 weight=3;
-    server 127.0.0.1:8003 weight=2;
-    
-    keepalive 32;
-}
-
-server {
-    listen 80;
-    server_name api.example.com;
-    
-    location / {
-        proxy_pass http://backend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        
-        # 连接保持
-        proxy_http_version 1.1;
-        proxy_set_header Connection "";
-        
-        # 超时配置
-        proxy_connect_timeout 5s;
-        proxy_send_timeout 30s;
-        proxy_read_timeout 30s;
-        
-        # 缓冲配置
-        proxy_buffering on;
-        proxy_buffer_size 4k;
-        proxy_buffers 8 4k;
-    }
-}
-```
-
-## 安全架构
-
-### 1. 认证授权
-
-**JWT 认证**:
-```python
-from jose import JWTError, jwt
-from datetime import datetime, timedelta
-
-class AuthService:
-    def __init__(self, secret_key: str, algorithm: str = "HS256"):
-        self.secret_key = secret_key
-        self.algorithm = algorithm
-        self.access_token_expire_minutes = 30
-    
-    def create_access_token(self, data: dict) -> str:
-        """创建访问令牌"""
-        to_encode = data.copy()
-        expire = datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
-        to_encode.update({"exp": expire})
-        
-        encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
-        return encoded_jwt
-    
-    def verify_token(self, token: str) -> dict:
-        """验证令牌"""
-        try:
-            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
-            return payload
-        except JWTError:
-            raise HTTPException(status_code=401, detail="无效的令牌")
-```
-
-**权限控制**:
-```python
-from functools import wraps
-
-def require_auth(f):
-    @wraps(f)
-    async def decorated_function(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if not token:
-            raise HTTPException(status_code=401, detail="缺少认证令牌")
-        
-        try:
-            payload = auth_service.verify_token(token)
-            request.current_user = payload
-        except HTTPException:
-            raise
-        
-        return await f(*args, **kwargs)
-    return decorated_function
-
-def require_permission(permission: str):
-    def decorator(f):
-        @wraps(f)
-        async def decorated_function(*args, **kwargs):
-            user = request.current_user
-            if permission not in user.get('permissions', []):
-                raise HTTPException(status_code=403, detail="权限不足")
-            return await f(*args, **kwargs)
-        return decorated_function
-    return decorator
-```
-
-### 2. 数据安全
-
-**输入验证**:
-```python
-from pydantic import BaseModel, validator, Field
-
-class TextDetectionRequest(BaseModel):
-    text: str = Field(..., min_length=1, max_length=10000)
-    
-    @validator('text')
-    def validate_text(cls, v):
-        # 检查是否包含恶意内容
-        if '<script>' in v.lower():
-            raise ValueError('文本包含恶意脚本')
-        return v.strip()
-
-class DocumentDetectionRequest(BaseModel):
-    file: UploadFile
-    
-    @validator('file')
-    def validate_file(cls, v):
-        # 检查文件类型
-        allowed_types = [
-            'text/plain',
-            'application/pdf',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        ]
-        if v.content_type not in allowed_types:
-            raise ValueError('不支持的文件类型')
-        
-        # 检查文件大小
-        if v.size > 10 * 1024 * 1024:  # 10MB
-            raise ValueError('文件大小超过限制')
-        
-        return v
-```
-
-**数据加密**:
-```python
-from cryptography.fernet import Fernet
-import base64
-
-class DataEncryption:
-    def __init__(self, key: bytes):
-        self.cipher = Fernet(key)
-    
-    def encrypt(self, data: str) -> str:
-        """加密数据"""
-        encrypted_data = self.cipher.encrypt(data.encode())
-        return base64.b64encode(encrypted_data).decode()
-    
-    def decrypt(self, encrypted_data: str) -> str:
-        """解密数据"""
-        decoded_data = base64.b64decode(encrypted_data.encode())
-        decrypted_data = self.cipher.decrypt(decoded_data)
-        return decrypted_data.decode()
-```
-
-### 3. 网络安全
-
-**HTTPS 配置**:
-```nginx
-server {
-    listen 443 ssl http2;
-    server_name api.example.com;
-    
-    # SSL 证书配置
-    ssl_certificate /etc/ssl/certs/api.example.com.crt;
-    ssl_certificate_key /etc/ssl/private/api.example.com.key;
-    
-    # SSL 安全配置
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512;
-    ssl_prefer_server_ciphers off;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 10m;
-    
-    # 安全头
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Frame-Options DENY;
-    add_header X-Content-Type-Options nosniff;
-    add_header X-XSS-Protection "1; mode=block";
-    add_header Referrer-Policy "strict-origin-when-cross-origin";
-    
-    location / {
-        proxy_pass http://backend;
-        # ... 其他配置
-    }
-}
-```
-
-**防火墙配置**:
-```bash
-# UFW 防火墙配置
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
-sudo ufw allow ssh
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw enable
-
-# iptables 配置
-sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT
-sudo iptables -A INPUT -p tcp --dport 443 -j ACCEPT
-sudo iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-sudo iptables -A INPUT -j DROP
-```
-
-## 监控架构
-
-### 1. 系统监控
-
-**Prometheus 配置**:
 ```yaml
-# prometheus.yml
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
-
-scrape_configs:
-  - job_name: 'sensitive-detector'
-    static_configs:
-      - targets: ['localhost:8000']
-    metrics_path: '/metrics'
-    scrape_interval: 30s
-
-  - job_name: 'node-exporter'
-    static_configs:
-      - targets: ['localhost:9100']
-
-  - job_name: 'docker'
-    static_configs:
-      - targets: ['localhost:9323']
-```
-
-**Grafana 仪表板**:
-```json
-{
-  "dashboard": {
-    "title": "敏感词检测系统监控",
-    "panels": [
-      {
-        "title": "API 请求率",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "rate(http_requests_total[5m])",
-            "legendFormat": "{{method}} {{endpoint}}"
-          }
-        ]
-      },
-      {
-        "title": "响应时间",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
-            "legendFormat": "95th percentile"
-          }
-        ]
-      },
-      {
-        "title": "错误率",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "rate(http_requests_total{status=~\"5..\"}[5m])",
-            "legendFormat": "5xx errors"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-### 2. 日志监控
-
-**ELK Stack 配置**:
-```yaml
-# docker-compose.logging.yml
-version: '3.8'
-
-services:
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-    ports:
-      - "9200:9200"
-    volumes:
-      - elasticsearch_data:/usr/share/elasticsearch/data
-
-  logstash:
-    image: docker.elastic.co/logstash/logstash:8.8.0
-    ports:
-      - "5044:5044"
-    volumes:
-      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
-    depends_on:
-      - elasticsearch
-
-  kibana:
-    image: docker.elastic.co/kibana/kibana:8.8.0
-    ports:
-      - "5601:5601"
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-    depends_on:
-      - elasticsearch
-
 volumes:
-  elasticsearch_data:
+  ollama_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/ollama
+  word_libraries:
+    type: bind
+    source: ./word_libraries
+    target: /app/word_libraries
+  config:
+    type: bind
+    source: ./detection_config.json
+    target: /app/detection_config.json
 ```
 
-**Logstash 配置**:
-```ruby
-# logstash.conf
-input {
-  beats {
-    port => 5044
-  }
-}
+## 🔧 配置架构
 
-filter {
-  if [fields][service] == "sensitive-detector" {
-    grok {
-      match => { "message" => "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}" }
-    }
-    
-    date {
-      match => [ "timestamp", "ISO8601" ]
-    }
-    
-    mutate {
-      add_field => { "service" => "sensitive-detector" }
-    }
-  }
-}
+### 配置层次
 
-output {
-  elasticsearch {
-    hosts => ["elasticsearch:9200"]
-    index => "sensitive-detector-%{+YYYY.MM.dd}"
-  }
-}
+```
+配置系统
+├── 环境变量
+│   ├── OLLAMA_BASE_URL
+│   ├── OLLAMA_MODEL
+│   ├── CORS_ALLOW_ORIGINS
+│   └── HEALTH_CHECK_ENABLED
+├── Docker 配置
+│   ├── docker-compose.yml
+│   ├── Dockerfile
+│   └── 资源限制
+├── 应用配置
+│   ├── detection_config.json
+│   ├── 词库配置
+│   └── 检测参数
+└── 系统配置
+    ├── 网络配置
+    ├── 存储配置
+    └── 监控配置
 ```
 
-### 3. 告警系统
+### 配置管理
 
-**Alertmanager 配置**:
-```yaml
-# alertmanager.yml
-global:
-  smtp_smarthost: 'localhost:587'
-  smtp_from: 'alerts@example.com'
+- **环境变量**: 运行时配置
+- **Docker Compose**: 服务编排配置
+- **JSON 配置**: 业务逻辑配置
+- **文件配置**: 词库和规则配置
 
-route:
-  group_by: ['alertname']
-  group_wait: 10s
-  group_interval: 10s
-  repeat_interval: 1h
-  receiver: 'web.hook'
+## 📊 监控架构
 
-receivers:
-  - name: 'web.hook'
-    webhook_configs:
-      - url: 'http://localhost:5001/'
+### 监控层次
 
-  - name: 'email'
-    email_configs:
-      - to: 'admin@example.com'
-        subject: '敏感词检测系统告警'
-        body: |
-          告警名称: {{ .GroupLabels.alertname }}
-          告警级别: {{ .GroupLabels.severity }}
-          告警时间: {{ .GroupLabels.timestamp }}
-          告警详情: {{ .GroupLabels.description }}
+```
+监控系统
+├── 服务监控
+│   ├── 容器状态
+│   ├── 服务健康
+│   └── 资源使用
+├── 应用监控
+│   ├── API 响应时间
+│   ├── 请求成功率
+│   └── 错误率统计
+├── 性能监控
+│   ├── CPU 使用率
+│   ├── 内存使用率
+│   └── 磁盘使用率
+└── 业务监控
+    ├── 检测准确率
+    ├── 模型性能
+    └── 用户行为
 ```
 
-**告警规则**:
-```yaml
-# alerts.yml
-groups:
-  - name: sensitive-detector
-    rules:
-      - alert: HighErrorRate
-        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "错误率过高"
-          description: "API 错误率超过 10%"
+### 监控工具
 
-      - alert: HighResponseTime
-        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "响应时间过长"
-          description: "95% 响应时间超过 2 秒"
+- **Docker**: 容器监控
+- **健康检查**: 服务状态监控
+- **日志系统**: 应用日志监控
+- **资源监控**: 系统资源监控
 
-      - alert: ServiceDown
-        expr: up == 0
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "服务不可用"
-          description: "敏感词检测服务不可用"
+## 🔒 安全架构
+
+### 安全层次
+
+```
+安全架构
+├── 网络安全
+│   ├── 容器网络隔离
+│   ├── 端口访问控制
+│   └── 防火墙配置
+├── 应用安全
+│   ├── 输入验证
+│   ├── 文件类型检查
+│   └── 大小限制
+├── 数据安全
+│   ├── 数据加密
+│   ├── 访问控制
+│   └── 备份策略
+└── 系统安全
+    ├── 容器安全
+    ├── 镜像安全
+    └── 运行时安全
 ```
 
-## 扩展性设计
+### 安全措施
 
-### 1. 水平扩展
+- **输入验证**: 严格的参数验证
+- **文件检查**: 文件类型和大小限制
+- **网络隔离**: 容器网络隔离
+- **访问控制**: 端口和权限控制
+- **数据保护**: 敏感数据加密
 
-**微服务拆分**:
-```python
-# 服务注册与发现
-class ServiceRegistry:
-    def __init__(self, consul_host: str, consul_port: int):
-        self.consul = consul.Consul(host=consul_host, port=consul_port)
-    
-    def register_service(self, service_name: str, service_id: str, 
-                        address: str, port: int, health_check: str):
-        """注册服务"""
-        self.consul.agent.service.register(
-            name=service_name,
-            service_id=service_id,
-            address=address,
-            port=port,
-            check=consul.Check.http(health_check, interval="10s")
-        )
-    
-    def discover_service(self, service_name: str) -> List[Service]:
-        """发现服务"""
-        services = self.consul.health.service(service_name, passing=True)[1]
-        return [Service(s['Service']['Address'], s['Service']['Port']) 
-                for s in services]
+## 🚀 扩展架构
+
+### 水平扩展
+
+```
+扩展架构
+├── 负载均衡
+│   ├── Nginx
+│   ├── HAProxy
+│   └── 云负载均衡
+├── 服务扩展
+│   ├── 应用服务扩展
+│   ├── Ollama 服务扩展
+│   └── 数据库扩展
+├── 存储扩展
+│   ├── 分布式存储
+│   ├── 对象存储
+│   └── 缓存系统
+└── 监控扩展
+    ├── 集中式监控
+    ├── 日志聚合
+    └── 告警系统
 ```
 
-**负载均衡**:
-```python
-class LoadBalancer:
-    def __init__(self, strategy: str = "round_robin"):
-        self.strategy = strategy
-        self.services = []
-        self.current_index = 0
-    
-    def add_service(self, service: Service):
-        """添加服务"""
-        self.services.append(service)
-    
-    def get_service(self) -> Service:
-        """获取服务"""
-        if not self.services:
-            raise NoServiceAvailableError("没有可用的服务")
-        
-        if self.strategy == "round_robin":
-            service = self.services[self.current_index]
-            self.current_index = (self.current_index + 1) % len(self.services)
-            return service
-        elif self.strategy == "random":
-            return random.choice(self.services)
-        elif self.strategy == "least_connections":
-            return min(self.services, key=lambda s: s.connection_count)
+### 扩展策略
+
+- **无状态设计**: 服务无状态，支持水平扩展
+- **数据分离**: 数据与计算分离
+- **缓存优化**: 多层缓存策略
+- **异步处理**: 异步任务处理
+
+## 📈 性能架构
+
+### 性能优化
+
+```
+性能优化
+├── 应用层优化
+│   ├── 代码优化
+│   ├── 算法优化
+│   └── 缓存优化
+├── 服务层优化
+│   ├── 连接池
+│   ├── 异步处理
+│   └── 资源复用
+├── 数据层优化
+│   ├── 数据压缩
+│   ├── 索引优化
+│   └── 查询优化
+└── 系统层优化
+    ├── 资源调优
+    ├── 网络优化
+    └── 存储优化
 ```
 
-### 2. 垂直扩展
+### 性能指标
 
-**资源监控**:
-```python
-import psutil
-import threading
-import time
+- **响应时间**: 文本检测 < 100ms，文档检测 < 500ms
+- **吞吐量**: 支持 100+ QPS
+- **并发数**: 支持 100+ 并发用户
+- **资源使用**: 内存 < 8GB，CPU < 80%
 
-class ResourceMonitor:
-    def __init__(self, threshold: float = 0.8):
-        self.threshold = threshold
-        self.monitoring = False
-        self.monitor_thread = None
-    
-    def start_monitoring(self):
-        """开始监控"""
-        self.monitoring = True
-        self.monitor_thread = threading.Thread(target=self._monitor_loop)
-        self.monitor_thread.start()
-    
-    def stop_monitoring(self):
-        """停止监控"""
-        self.monitoring = False
-        if self.monitor_thread:
-            self.monitor_thread.join()
-    
-    def _monitor_loop(self):
-        """监控循环"""
-        while self.monitoring:
-            cpu_percent = psutil.cpu_percent(interval=1)
-            memory_percent = psutil.virtual_memory().percent
-            
-            if cpu_percent > self.threshold * 100:
-                self._handle_high_cpu(cpu_percent)
-            
-            if memory_percent > self.threshold * 100:
-                self._handle_high_memory(memory_percent)
-            
-            time.sleep(10)
-    
-    def _handle_high_cpu(self, cpu_percent: float):
-        """处理高 CPU 使用率"""
-        logger.warning(f"CPU 使用率过高: {cpu_percent}%")
-        # 触发扩容或优化
-    
-    def _handle_high_memory(self, memory_percent: float):
-        """处理高内存使用率"""
-        logger.warning(f"内存使用率过高: {memory_percent}%")
-        # 触发扩容或垃圾回收
+## 🔄 部署架构
+
+### 部署模式
+
+```
+部署架构
+├── 开发环境
+│   ├── 本地开发
+│   ├── Docker 开发
+│   └── 热重载
+├── 测试环境
+│   ├── 单元测试
+│   ├── 集成测试
+│   └── 性能测试
+├── 生产环境
+│   ├── 容器化部署
+│   ├── 服务编排
+│   └── 监控告警
+└── 运维环境
+    ├── 日志管理
+    ├── 备份恢复
+    └── 故障处理
 ```
 
-### 3. 数据库扩展
+### 部署策略
 
-**读写分离**:
-```python
-class DatabaseManager:
-    def __init__(self):
-        self.write_db = create_engine("postgresql://write_db_url")
-        self.read_db = create_engine("postgresql://read_db_url")
-        self.read_replicas = [
-            create_engine("postgresql://read_replica1_url"),
-            create_engine("postgresql://read_replica2_url")
-        ]
-    
-    def get_write_connection(self):
-        """获取写连接"""
-        return self.write_db
-    
-    def get_read_connection(self):
-        """获取读连接"""
-        # 轮询选择读副本
-        replica = self.read_replicas[self.current_replica]
-        self.current_replica = (self.current_replica + 1) % len(self.read_replicas)
-        return replica
-```
-
-**分库分表**:
-```python
-class ShardingManager:
-    def __init__(self, shard_count: int = 4):
-        self.shard_count = shard_count
-        self.shards = [
-            create_engine(f"postgresql://shard_{i}_url") 
-            for i in range(shard_count)
-        ]
-    
-    def get_shard(self, key: str) -> Engine:
-        """根据键获取分片"""
-        shard_index = hash(key) % self.shard_count
-        return self.shards[shard_index]
-    
-    def execute_on_all_shards(self, query: str, params: dict):
-        """在所有分片上执行查询"""
-        results = []
-        for shard in self.shards:
-            result = shard.execute(query, params)
-            results.append(result)
-        return results
-```
-
-## 容错设计
-
-### 1. 故障隔离
-
-**熔断器模式**:
-```python
-import time
-from enum import Enum
-
-class CircuitState(Enum):
-    CLOSED = "closed"
-    OPEN = "open"
-    HALF_OPEN = "half_open"
-
-class CircuitBreaker:
-    def __init__(self, failure_threshold: int = 5, timeout: int = 60):
-        self.failure_threshold = failure_threshold
-        self.timeout = timeout
-        self.failure_count = 0
-        self.last_failure_time = None
-        self.state = CircuitState.CLOSED
-    
-    def call(self, func, *args, **kwargs):
-        """调用受保护的方法"""
-        if self.state == CircuitState.OPEN:
-            if time.time() - self.last_failure_time > self.timeout:
-                self.state = CircuitState.HALF_OPEN
-            else:
-                raise CircuitBreakerOpenError("熔断器开启")
-        
-        try:
-            result = func(*args, **kwargs)
-            self._on_success()
-            return result
-        except Exception as e:
-            self._on_failure()
-            raise e
-    
-    def _on_success(self):
-        """成功时重置"""
-        self.failure_count = 0
-        self.state = CircuitState.CLOSED
-    
-    def _on_failure(self):
-        """失败时计数"""
-        self.failure_count += 1
-        self.last_failure_time = time.time()
-        
-        if self.failure_count >= self.failure_threshold:
-            self.state = CircuitState.OPEN
-```
-
-**重试机制**:
-```python
-import asyncio
-from functools import wraps
-
-def retry(max_attempts: int = 3, delay: float = 1.0, backoff: float = 2.0):
-    def decorator(func):
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            last_exception = None
-            
-            for attempt in range(max_attempts):
-                try:
-                    return await func(*args, **kwargs)
-                except Exception as e:
-                    last_exception = e
-                    
-                    if attempt == max_attempts - 1:
-                        break
-                    
-                    wait_time = delay * (backoff ** attempt)
-                    await asyncio.sleep(wait_time)
-            
-            raise last_exception
-        return wrapper
-    return decorator
-
-# 使用示例
-@retry(max_attempts=3, delay=1.0, backoff=2.0)
-async def call_ollama_api(text: str) -> str:
-    # API 调用逻辑
-    pass
-```
-
-### 2. 降级策略
-
-**服务降级**:
-```python
-class ServiceDegradation:
-    def __init__(self):
-        self.degradation_level = 0  # 0: 正常, 1: 轻度降级, 2: 重度降级
-    
-    def detect_text(self, text: str) -> dict:
-        """文本检测（支持降级）"""
-        if self.degradation_level == 0:
-            # 正常模式：规则 + LLM
-            rule_result = self.rule_detection(text)
-            llm_result = self.llm_detection(text)
-            return self.combine_results(rule_result, llm_result)
-        
-        elif self.degradation_level == 1:
-            # 轻度降级：仅规则检测
-            rule_result = self.rule_detection(text)
-            return {"rule_detected": rule_result, "llm_detected": "正常", "final_result": rule_result}
-        
-        else:
-            # 重度降级：返回默认结果
-            return {"rule_detected": "正常", "llm_detected": "正常", "final_result": "正常"}
-    
-    def update_degradation_level(self, level: int):
-        """更新降级级别"""
-        self.degradation_level = level
-        logger.info(f"服务降级级别更新为: {level}")
-```
-
-### 3. 数据备份
-
-**自动备份**:
-```python
-import shutil
-import schedule
-import time
-from datetime import datetime
-
-class BackupManager:
-    def __init__(self, backup_dir: str = "/opt/backups"):
-        self.backup_dir = backup_dir
-        self.schedule_backup()
-    
-    def schedule_backup(self):
-        """调度备份任务"""
-        schedule.every().day.at("02:00").do(self.full_backup)
-        schedule.every().hour.do(self.incremental_backup)
-    
-    def full_backup(self):
-        """全量备份"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = f"{self.backup_dir}/full_backup_{timestamp}"
-        
-        try:
-            shutil.copytree("/opt/sensitive-detector", backup_path)
-            logger.info(f"全量备份完成: {backup_path}")
-        except Exception as e:
-            logger.error(f"全量备份失败: {e}")
-    
-    def incremental_backup(self):
-        """增量备份"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_path = f"{self.backup_dir}/incremental_backup_{timestamp}"
-        
-        try:
-            # 只备份变更的文件
-            self.backup_changed_files(backup_path)
-            logger.info(f"增量备份完成: {backup_path}")
-        except Exception as e:
-            logger.error(f"增量备份失败: {e}")
-    
-    def run_scheduler(self):
-        """运行调度器"""
-        while True:
-            schedule.run_pending()
-            time.sleep(60)
-```
-
-## 总结
-
-敏感词检测系统采用现代化的微服务架构，具备以下特点：
-
-1. **高可用性**: 通过负载均衡、故障转移、自动恢复等机制确保服务稳定运行
-2. **高性能**: 采用异步处理、缓存优化、连接池等技术提升系统性能
-3. **可扩展性**: 支持水平扩展和垂直扩展，适应业务增长需求
-4. **安全性**: 多层次安全防护，包括认证授权、数据加密、网络安全等
-5. **可观测性**: 完善的监控、日志、告警体系，便于运维管理
-6. **容错性**: 熔断器、重试机制、降级策略等确保系统在异常情况下的稳定性
-
-该架构设计为系统提供了坚实的技术基础，能够满足当前业务需求并支持未来发展。
+- **容器化**: Docker 容器化部署
+- **编排**: Docker Compose 服务编排
+- **配置**: 环境变量和配置文件
+- **监控**: 完善的监控和告警
 
 ---
 
-**文档版本**: v1.0.0  
-**最后更新**: 2025年10月
+**最后更新**: 2025年1月
+**版本**: v1.0.0

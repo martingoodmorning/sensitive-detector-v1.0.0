@@ -1128,3 +1128,77 @@ body {
     gap: 15px;
     flex-wrap: wrap;
 }
+
+/* 词库状态指示器样式 */
+.library-status-indicator {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.status-item:last-child {
+    margin-bottom: 0;
+}
+
+.status-item i {
+    color: #667eea;
+    font-size: 1.1rem;
+    width: 20px;
+    text-align: center;
+}
+
+.status-label {
+    font-weight: 500;
+    color: #555;
+    min-width: 80px;
+}
+
+.status-value {
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.status-value.status-default {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.status-value.status-custom {
+    background: #e8f5e8;
+    color: #2e7d32;
+}
+
+.status-value.status-loading {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .library-status-indicator {
+        padding: 15px;
+    }
+    
+    .status-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .status-label {
+        min-width: auto;
+        font-size: 0.9rem;
+    }
+}

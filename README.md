@@ -16,6 +16,7 @@
 - [部署指南](#部署指南)
 - [开发指南](#开发指南)
 - [故障排除](#故障排除)
+- [技术文档](#技术文档)
 
 ## 🎯 项目概述
 
@@ -189,8 +190,8 @@ graph TD
 ### 环境要求
 
 - Docker & Docker Compose
-- WSL (Windows 用户)
 - 8GB+ 内存 (运行 qwen2.5:7b 量化模型)
+- 20GB+ 磁盘空间
 
 ### 一键启动
 
@@ -199,22 +200,25 @@ graph TD
 git clone https://github.com/martingoodmorning/sensitive-detector-v1.0.0.git
 cd sensitive-detector
 
-# 2. 启动 Ollama 服务
-export OLLAMA_HOST=0.0.0.0:11434
-ollama serve &
-ollama pull qwen2.5:7b-instruct-q4_K_M
+# 2. 一键启动所有服务
+docker-compose up -d
 
-# 或者使用快速设置脚本
-chmod +x scripts/setup_quantized_model.sh
-./scripts/setup_quantized_model.sh
-
-# 3. 启动项目
-docker compose up -d
+# 3. 等待服务启动（首次启动需要下载模型，约5-10分钟）
+# 查看启动进度
+docker-compose logs -f
 
 # 4. 访问系统
 # 前端界面: http://localhost:8000
 # API 文档: http://localhost:8000/docs
+# 健康检查: http://localhost:8000/health
 ```
+
+**系统会自动**：
+- ✅ 拉取 Ollama 镜像
+- ✅ 启动 Ollama 服务
+- ✅ 检查并下载 Qwen 模型
+- ✅ 启动应用服务
+- ✅ 进行模型预热
 
 详细部署说明请参考 [部署指南](#部署指南)。
 
@@ -375,53 +379,71 @@ docker compose up -d
 
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama 服务地址（Host模式） |
+| `OLLAMA_BASE_URL` | `http://ollama:11434` | Ollama 服务地址（容器内） |
 | `OLLAMA_MODEL` | `qwen2.5:7b-instruct-q4_K_M` | 使用的 LLM 模型（推荐量化版本） |
 | `CORS_ALLOW_ORIGINS` | `*` | CORS 允许的源 |
 | `PYTHONUNBUFFERED` | `1` | Python 输出缓冲 |
+| `HEALTH_CHECK_ENABLED` | `true` | 启用健康检查 |
 
-**网络配置说明**：
-- **Host模式**：容器使用宿主机网络，Ollama服务地址为 `localhost:11434`
-- **Bridge模式**：如需使用Bridge模式，请将 `OLLAMA_BASE_URL` 改为 `http://172.17.0.1:11434`
+### Docker 配置
 
-### Docker网络配置
 
-#### Host模式（默认推荐）
-
-**配置**：
 ```yaml
-network_mode: host
-environment:
-  - OLLAMA_BASE_URL=http://localhost:11434
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-service
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: '4.0'
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  sensitive-detector:
+    build: ./backend
+    container_name: sensitive-detector
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./frontend:/app/frontend
+      - ./word_libraries:/app/word_libraries
+      - ./detection_config.json:/app/detection_config.json
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
+    depends_on:
+      ollama:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+
+volumes:
+  ollama_data:
+    driver: local
+    device: ./data/ollama
 ```
 
 **优势**：
-- ✅ Ollama连接稳定可靠
-- ✅ 网络配置简单
-- ✅ 适合本地开发环境
+- ✅ 完全容器化，无需外部依赖
+- ✅ 数据持久化存储
+- ✅ 资源限制和健康检查
+- ✅ 服务依赖管理
+- ✅ 适合生产环境部署
 
-**注意事项**：
-- ⚠️ 容器直接使用宿主机网络
-- ⚠️ 适合开发环境，生产环境需谨慎
-
-#### Bridge模式（可选）
-
-**配置**：
-```yaml
-ports:
-  - "8000:8000"
-environment:
-  - OLLAMA_BASE_URL=http://172.17.0.1:11434
-```
-
-**优势**：
-- ✅ 网络隔离性好
-- ✅ 适合生产环境
-- ✅ 安全性更高
-
-**注意事项**：
-- ⚠️ 需要确保Ollama服务可被Docker网关访问
-- ⚠️ 可能需要额外的网络配置
 
 ### 量化模型配置
 
@@ -443,7 +465,7 @@ ollama pull qwen2.5:7b-instruct-q4_K_M
 ollama pull qwen2.5:3b-instruct-q4_K_M
 ```
 
-详细配置请参考：[量化模型配置指南](docs/OLLAMA_QUANTIZED_MODELS.md)
+详细配置请参考：[生产环境部署指南](docs/PRODUCTION_DEPLOYMENT.md)
 
 ### 敏感词配置
 
@@ -473,34 +495,63 @@ ollama pull qwen2.5:3b-instruct-q4_K_M
 伤害
 ```
 
-### Docker 配置
+### 故障排除
 
-#### docker-compose.yml 关键配置
+#### 常见问题
 
-```yaml
-services:
-  sensitive-detector-backend:
-    build: ./backend
-    container_name: sensitive-detector
-    network_mode: host  # 使用host网络模式，直接访问宿主机服务
-    volumes:
-      - ./frontend:/app/frontend
-      - ./word_libraries:/app/word_libraries
-      - ./detection_config.json:/app/detection_config.json
-    environment:
-      - OLLAMA_BASE_URL=http://localhost:11434
-      - OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
-    restart: unless-stopped
-```
+1. **容器启动失败**
+   ```bash
+   # 检查容器状态
+   docker-compose ps
+   
+   # 查看错误日志
+   docker-compose logs ollama
+   docker-compose logs sensitive-detector
+   ```
 
-**网络配置说明**：
-- **Host模式**：容器直接使用宿主机网络，确保Ollama服务连接稳定
-- **端口访问**：前端仍通过 `http://localhost:8000` 访问
-- **Ollama连接**：使用 `http://localhost:11434` 连接本地Ollama服务
+2. **模型下载失败**
+   ```bash
+   # 检查网络连接
+   docker-compose exec ollama curl -I https://ollama.ai
+   
+   # 手动下载模型
+   docker-compose exec ollama ollama pull qwen2.5:7b-instruct-q4_K_M
+   ```
+
+3. **服务健康检查失败**
+   ```bash
+   # 检查服务状态
+   curl http://localhost:8000/health
+   curl http://localhost:11434/api/tags
+   
+   # 重启服务
+   docker-compose restart
+   ```
+
+4. **资源不足**
+   ```bash
+   # 检查系统资源
+   free -h
+   df -h
+   
+   # 调整资源限制（编辑 docker-compose.yml）
+   ```
+
+#### 性能优化
+
+1. **模型选择**
+   - 生产环境：`qwen2.5:7b-instruct-q4_K_M` (4.1GB)
+   - 开发测试：`qwen2.5:3b-instruct-q4_K_M` (1.9GB)
+   - 资源受限：`qwen2.5:1.5b-instruct-q4_K_M` (0.9GB)
+
+2. **资源调优**
+   - 根据服务器配置调整内存和CPU限制
+   - 监控资源使用情况
+   - 优化模型预热策略
 
 ## 🚢 部署指南
 
-### 快速部署 (推荐)
+### 生产环境部署（推荐）
 
 **一键部署**:
 ```bash
@@ -508,13 +559,11 @@ services:
 git clone https://github.com/martingoodmorning/sensitive-detector-v1.0.0.git
 cd sensitive-detector
 
-# 2. 启动 Ollama 服务
-export OLLAMA_HOST=0.0.0.0:11434
-ollama serve &
-ollama pull qwen2.5:7b-instruct-q4_K_M
+# 2. 启动所有服务
+docker-compose up -d
 
-# 3. 启动项目
-docker compose up -d
+# 3. 监控启动过程
+docker-compose logs -f
 
 # 4. 访问系统
 # 浏览器打开: http://localhost:8000
@@ -528,32 +577,74 @@ docker compose up -d
 - **内存**: 8GB+ (推荐 16GB，运行 qwen2.5:7b 量化模型)
 - **磁盘**: 20GB+ 可用空间
 
-### 详细部署说明
+### 服务架构
 
-详细的 Docker 部署指南请参考 [Docker 部署文档](docs/DOCKER_DEPLOYMENT.md)，包括：
-- Docker 配置说明
-- 环境变量配置
-- 故障排除指南
-- 性能优化建议
+```
+┌─────────────────┐    ┌─────────────────┐
+│   Ollama 容器    │    │   应用容器       │
+│   ollama-service│────│sensitive-detector│
+│   8GB 内存限制   │    │   2GB 内存限制   │
+│   4 核心 CPU    │    │   1 核心 CPU    │
+└─────────────────┘    └─────────────────┘
+         │                       │
+         └───────────────────────┼─────────────────┐
+                                 │                 │
+                    ┌─────────────────┐    ┌─────────────────┐
+                    │   模型数据       │    │   配置文件       │
+                    │   ./data/ollama  │    │   Volumes       │
+                    │   持久化存储     │    │   持久化存储     │
+                    └─────────────────┘    └─────────────────┘
+```
 
+### 服务管理
 
-### 监控和维护
-
-1. **日志查看**
+1. **查看服务状态**
    ```bash
-   docker compose logs -f sensitive-detector-backend
+   docker-compose ps
    ```
 
-2. **服务状态检查**
+2. **查看日志**
    ```bash
-   docker compose ps
-   curl http://localhost:8000/health
+   # 查看所有服务日志
+   docker-compose logs -f
+   
+   # 查看特定服务日志
+   docker-compose logs -f ollama
+   docker-compose logs -f sensitive-detector
    ```
 
-3. **性能监控**
-   - 内存使用: `docker stats sensitive-detector`
-   - API 响应时间: 通过日志分析
-   - LLM 推理时间: 通过日志分析
+3. **管理模型**
+   ```bash
+   # 查看已下载的模型
+   docker-compose exec ollama ollama list
+   
+   # 下载新模型
+   docker-compose exec ollama ollama pull qwen2.5:3b-instruct-q4_K_M
+   
+   # 删除模型
+   docker-compose exec ollama ollama rm qwen2.5:7b-instruct-q4_K_M
+   ```
+
+4. **重启服务**
+   ```bash
+   # 重启所有服务
+   docker-compose restart
+   
+   # 重启特定服务
+   docker-compose restart ollama
+   docker-compose restart sensitive-detector
+   ```
+
+5. **停止服务**
+   ```bash
+   docker-compose down
+   ```
+
+### 健康检查
+
+- **应用健康检查**: http://localhost:8000/health
+- **Ollama 服务检查**: http://localhost:11434/api/tags
+- **Web 界面**: http://localhost:8000
 
 ## 🛠️ 开发指南
 
@@ -625,6 +716,22 @@ docker compose up -d
    - chore: 构建过程或辅助工具的变动
 
 
+## 📚 技术文档
+
+### 详细文档
+
+- **[生产环境部署指南](docs/PRODUCTION_DEPLOYMENT.md)** - 详细的生产环境部署说明
+- **[API 文档](docs/API.md)** - 完整的 API 接口文档
+- **[系统架构文档](docs/ARCHITECTURE.md)** - 系统架构设计说明
+- **[故障排除指南](docs/TROUBLESHOOTING.md)** - 常见问题解决方案
+
+### 快速参考
+
+- **部署命令**: `docker-compose up -d`
+- **健康检查**: `curl http://localhost:8000/health`
+- **服务状态**: `docker-compose ps`
+- **查看日志**: `docker-compose logs -f`
+
 ### 联系方式
 
 - **项目维护者**: [xxx]
@@ -633,6 +740,7 @@ docker compose up -d
 
 ### 贡献指南
 
+欢迎提交 Issue 和 Pull Request！
 
 **最后更新**: 2025年1月
 **版本**: v1.0.0
