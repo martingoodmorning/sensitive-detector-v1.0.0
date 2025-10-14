@@ -1059,6 +1059,14 @@ async def detect_document(file: UploadFile = File(...)):
             detail=f"不支持的文件类型！支持：TXT、PDF、DOCX、DOC、图片格式（OCR）"
         )
 
+    # 1.1 校验文件大小（限制10MB）
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+    if file.size and file.size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"文件过大！文件大小不能超过10MB，当前文件大小：{file.size / (1024 * 1024):.2f}MB"
+        )
+
     # 2. 读取文件内容（根据文件类型解析）
     content = await file.read()
     text = ""

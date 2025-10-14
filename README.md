@@ -99,14 +99,14 @@
    - 支持 TXT、PDF、DOCX、DOC 格式
    - 支持图片OCR识别（JPG、PNG、BMP、GIF、TIFF）
    - 文件大小限制（10MB）
-   - 字符限制（10000个字符）
+   - 文本长度限制（10000个字符）
    - 拖拽上传支持
    - 严格模式：直接使用大模型检测
 
 3. **智能检测**
-   - 基于 AC自动机 + DFA 的敏感词匹配
-   - 大语言模型内容理解
-   - 检测结果一致性保证
+   - 基于文本预处理 + AC自动机 + DFA 的敏感词匹配
+   - 大语言模型语义理解
+   - 规则匹配快速筛选 + 存疑内容LLM智能检测
 
 4. **用户界面**
    - 响应式设计
@@ -205,11 +205,11 @@ docker-compose up -d
 
 # 3. 等待服务启动（首次启动需要下载模型，约5-10分钟）
 # 查看启动进度
-docker-compose logs -f
+# docker-compose logs -f
 
 # 4. 访问系统
 # 前端界面: http://localhost:8000
-# API 文档: http://localhost:8000/docs
+# API 文档: http://localhost:8000/api/docs
 # 健康检查: http://localhost:8000/health
 ```
 
@@ -283,7 +283,55 @@ docker-compose logs -f
 }
 ```
 
-#### 3. 健康检查
+#### 3. 词库管理
+
+**获取词库列表**: `GET /word-libraries`
+
+**响应格式**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "政治类型",
+      "name": "政治类型",
+      "filename": "政治类型.txt",
+      "word_count": 1234,
+      "created_time": "2025-01-01T00:00:00Z",
+      "modified_time": "2025-01-01T00:00:00Z",
+      "size": 12345
+    }
+  ]
+}
+```
+
+**创建词库**: `POST /word-libraries`
+
+**请求参数**:
+```json
+{
+  "name": "新词库名称",
+  "words": ["敏感词1", "敏感词2", "敏感词3"]
+}
+```
+
+**获取词库内容**: `GET /word-libraries/{name}`
+
+**更新词库**: `PUT /word-libraries/{name}`
+
+**删除词库**: `DELETE /word-libraries/{name}`
+
+**更新检测词库配置**: `POST /detection-libraries/update`
+
+**获取检测词库状态**: `GET /detection-libraries/status`
+
+#### 4. 模型管理
+
+**获取模型状态**: `GET /model-status`
+
+**预热模型**: `POST /warm-up-model`
+
+#### 5. 健康检查
 
 **接口地址**: `GET /health`
 
@@ -363,8 +411,8 @@ docker-compose logs -f
 3. **文件处理**
    - 拖拽上传
    - 文件类型验证
-   - 文件大小限制
-   - 上传进度显示
+   - 文件大小限制（10MB）
+   - 文本长度限制（10000个字符）
 
 ### 样式设计
 
@@ -384,6 +432,9 @@ docker-compose logs -f
 | `CORS_ALLOW_ORIGINS` | `*` | CORS 允许的源 |
 | `PYTHONUNBUFFERED` | `1` | Python 输出缓冲 |
 | `HEALTH_CHECK_ENABLED` | `true` | 启用健康检查 |
+| `OLLAMA_HOST` | `0.0.0.0` | Ollama 服务监听地址 |
+| `OLLAMA_NUM_PARALLEL` | `2` | Ollama 并行请求数 |
+| `OLLAMA_MAX_LOADED_MODELS` | `1` | Ollama 最大加载模型数 |
 
 ### Docker 配置
 
@@ -399,16 +450,24 @@ services:
       - ollama_data:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_NUM_PARALLEL=2
+      - OLLAMA_MAX_LOADED_MODELS=1
+    restart: unless-stopped
+    runtime: nvidia
     deploy:
       resources:
         limits:
+          memory: 16G
+          cpus: '12.0'
+        reservations:
           memory: 8G
-          cpus: '4.0'
+          cpus: '6.0'
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
 
   sensitive-detector:
     build: ./backend
@@ -420,21 +479,37 @@ services:
       - ./word_libraries:/app/word_libraries
       - ./detection_config.json:/app/detection_config.json
     environment:
+      - PYTHONUNBUFFERED=1
       - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
+      - CORS_ALLOW_ORIGINS=*
+      - HEALTH_CHECK_ENABLED=true
     depends_on:
       ollama:
         condition: service_healthy
+    restart: unless-stopped
     deploy:
       resources:
         limits:
           memory: 2G
           cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 volumes:
   ollama_data:
     driver: local
-    device: ./data/ollama
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/ollama
 ```
 
 **优势**：
@@ -537,17 +612,6 @@ ollama pull qwen2.5:3b-instruct-q4_K_M
    # 调整资源限制（编辑 docker-compose.yml）
    ```
 
-#### 性能优化
-
-1. **模型选择**
-   - 生产环境：`qwen2.5:7b-instruct-q4_K_M` (4.1GB)
-   - 开发测试：`qwen2.5:3b-instruct-q4_K_M` (1.9GB)
-   - 资源受限：`qwen2.5:1.5b-instruct-q4_K_M` (0.9GB)
-
-2. **资源调优**
-   - 根据服务器配置调整内存和CPU限制
-   - 监控资源使用情况
-   - 优化模型预热策略
 
 ## 🚢 部署指南
 
@@ -574,7 +638,7 @@ docker-compose logs -f
 - **操作系统**: Linux (Ubuntu 20.04+ 推荐) 或 Windows WSL
 - **Docker**: 20.10+ 
 - **Docker Compose**: 2.0+
-- **内存**: 8GB+ (推荐 16GB，运行 qwen2.5:7b 量化模型)
+- **内存**: 16GB+ (推荐 32GB，运行 qwen2.5:7b 量化模型)
 - **磁盘**: 20GB+ 可用空间
 
 ### 服务架构
@@ -583,8 +647,8 @@ docker-compose logs -f
 ┌─────────────────┐    ┌─────────────────┐
 │   Ollama 容器    │    │   应用容器       │
 │   ollama-service│────│sensitive-detector│
-│   8GB 内存限制   │    │   2GB 内存限制   │
-│   4 核心 CPU    │    │   1 核心 CPU    │
+│   16GB 内存限制  │    │   2GB 内存限制   │
+│   12 核心 CPU   │    │   1 核心 CPU    │
 └─────────────────┘    └─────────────────┘
          │                       │
          └───────────────────────┼─────────────────┐
@@ -645,6 +709,7 @@ docker-compose logs -f
 - **应用健康检查**: http://localhost:8000/health
 - **Ollama 服务检查**: http://localhost:11434/api/tags
 - **Web 界面**: http://localhost:8000
+- **API 文档**: http://localhost:8000/api/docs
 
 ## 🛠️ 开发指南
 
@@ -683,12 +748,27 @@ docker-compose logs -f
    │   ├── main.py              # FastAPI 应用主文件
    │   ├── requirements.txt     # Python 依赖
    │   ├── Dockerfile          # Docker 构建文件
-   │   └── sensitive_words.txt # 敏感词库
+   │   └── start.sh            # 启动脚本
    ├── frontend/
    │   ├── index.html          # 主页面
    │   ├── style.css           # 样式文件
    │   └── script.js           # 交互逻辑
+   ├── word_libraries/         # 敏感词库目录
+   │   ├── 政治类型.txt
+   │   ├── 色情类型.txt
+   │   └── ...                 # 其他词库文件
+   ├── data/                   # 数据目录
+   │   └── ollama/            # Ollama 模型数据
+   ├── demo/                   # 演示文件
+   │   ├── normal_samples/     # 正常样本
+   │   └── sensitive_samples/  # 敏感样本
+   ├── docs/                   # 技术文档
+   │   ├── API.md
+   │   ├── ARCHITECTURE.md
+   │   └── ...                 # 其他文档
    ├── docker-compose.yml      # Docker 编排文件
+   ├── detection_config.json   # 检测配置文件
+   ├── VERSION                 # 版本信息
    └── README.md              # 项目文档
    ```
 
@@ -729,6 +809,7 @@ docker-compose logs -f
 
 - **部署命令**: `docker-compose up -d`
 - **健康检查**: `curl http://localhost:8000/health`
+- **API文档**: `http://localhost:8000/api/docs`
 - **服务状态**: `docker-compose ps`
 - **查看日志**: `docker-compose logs -f`
 
@@ -742,5 +823,5 @@ docker-compose logs -f
 
 欢迎提交 Issue 和 Pull Request！
 
-**最后更新**: 2025年1月
+**最后更新**: 2025年10月
 **版本**: v1.0.0

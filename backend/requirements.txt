@@ -5,7 +5,6 @@ python-docx==0.8.11
 PyPDF2==3.0.1
 requests==2.32.3  # 新增：用于调用 Ollama API
 python-multipart==0.0.9
-# 文档解析相关依赖
 docx2txt==0.9
 pytesseract==0.3.13
 Pillow==10.0.0
