@@ -505,20 +505,24 @@ services:
 
 volumes:
   ollama_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/ollama
+    external: true
+    name: sensitive-detector_ollama_data
 ```
 
 **优势**：
 - ✅ 完全容器化，无需外部依赖
-- ✅ 数据持久化存储
+- ✅ Docker管理的持久化存储
+- ✅ 跨平台兼容性好
 - ✅ 资源限制和健康检查
 - ✅ 服务依赖管理
+- ✅ 支持数据备份和恢复
 - ✅ 适合生产环境部署
 
+**Docker命名卷说明**：
+- 使用Docker管理的命名卷 `sensitive-detector_ollama_data`
+- 模型数据存储在Docker内部，自动管理生命周期
+- 支持跨平台部署，无需担心路径问题
+- 可通过 `docker volume` 命令进行备份和管理
 
 ### 量化模型配置
 
@@ -704,6 +708,21 @@ docker-compose logs -f
    docker-compose down
    ```
 
+6. **Docker卷管理**
+   ```bash
+   # 查看卷信息
+   docker volume inspect sensitive-detector_ollama_data
+   
+   # 备份模型数据
+   docker run --rm -v sensitive-detector_ollama_data:/data -v $(pwd):/backup alpine tar czf /backup/ollama-backup.tar.gz -C /data .
+   
+   # 恢复模型数据
+   docker run --rm -v sensitive-detector_ollama_data:/data -v $(pwd):/backup alpine tar xzf /backup/ollama-backup.tar.gz -C /data
+   
+   # 删除卷（谨慎操作）
+   docker volume rm sensitive-detector_ollama_data
+   ```
+
 ### 健康检查
 
 - **应用健康检查**: http://localhost:8000/health
@@ -812,6 +831,7 @@ docker-compose logs -f
 - **API文档**: `http://localhost:8000/api/docs`
 - **服务状态**: `docker-compose ps`
 - **查看日志**: `docker-compose logs -f`
+- **卷管理**: `docker volume inspect sensitive-detector_ollama_data`
 
 ### 联系方式
 

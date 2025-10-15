@@ -70,8 +70,5 @@ services:
 # 定义 volumes
 volumes:
   ollama_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./data/ollama
+    external: true
+    name: sensitive-detector_ollama_data
