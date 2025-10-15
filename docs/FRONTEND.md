@@ -1,4 +1,7 @@
-# 前端技术文档
+# 前端技术文档 v1.0.0
+
+**版本**: v1.0.0  
+**更新时间**: 2025年10月
 
 ## 概述
 
@@ -7,20 +10,41 @@
 ## 技术栈
 
 - **HTML5**: 语义化标记语言
-- **CSS3**: 样式设计和动画效果
-- **JavaScript ES6+**: 交互逻辑和 API 调用
-- **Fetch API**: HTTP 请求处理
+- **CSS3**: 现代化样式设计，支持渐变、动画、响应式布局
+- **JavaScript ES6+**: 现代JavaScript特性，异步处理
+- **Fetch API**: HTTP请求处理
 - **Drag & Drop API**: 文件拖拽上传
-- **Font Awesome**: 图标库
+- **Font Awesome 6.0**: 图标库
+- **Google Fonts**: Inter字体
 
 ## 项目结构
 
 ```
 frontend/
-├── index.html          # 主页面文件
-├── style.css           # 样式文件
-└── script.js           # 交互逻辑文件
+├── index.html          # 主页面文件 (295行)
+├── style.css           # 样式文件 (1204行)
+└── script.js           # JavaScript逻辑 (912行)
 ```
+
+## 核心功能
+
+### 1. 文本检测
+- **输入区域**: 支持最多10000字符的文本输入
+- **严格模式**: 可选的严格模式，跳过规则匹配直接使用大模型检测
+- **字符计数**: 实时显示输入字符数量
+- **检测结果**: 显示规则引擎和大模型检测结果
+
+### 2. 文档检测
+- **文件上传**: 支持拖拽和点击上传
+- **格式支持**: TXT、PDF、DOCX、DOC、图片格式（OCR）
+- **文件大小**: 最大支持10MB
+- **严格模式**: 文档检测默认使用严格模式
+
+### 3. 词库管理
+- **词库列表**: 显示所有可用词库
+- **使用词库**: 管理当前检测使用的词库
+- **词库编辑**: 创建、编辑、删除词库
+- **状态指示**: 显示当前词库状态和最后更新时间
 
 ## 文件详解
 
@@ -34,17 +58,44 @@ frontend/
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <!-- 元数据定义 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>敏感词检测系统</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <div class="container">
-        <!-- 顶部导航 -->
+        <!-- 头部 -->
         <header class="header">
-            <!-- 系统标题和标签页 -->
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-shield-alt"></i>
+                    <h1>敏感词检测系统</h1>
+                </div>
+                <p class="subtitle">智能文本内容安全检测平台</p>
+            </div>
         </header>
-        
+
         <!-- 主要内容区域 -->
         <main class="main-content">
+            <!-- 功能选择标签 -->
+            <div class="tab-container">
+                <button class="tab-btn active" data-tab="text">
+                    <i class="fas fa-keyboard"></i>
+                    文本检测
+                </button>
+                <button class="tab-btn" data-tab="document">
+                    <i class="fas fa-file-upload"></i>
+                    文档检测
+                </button>
+                <button class="tab-btn" data-tab="libraries">
+                    <i class="fas fa-database"></i>
+                    词库管理
+                </button>
+            </div>
+
             <!-- 文本检测面板 -->
             <div class="panel active" id="text-panel">
                 <!-- 文本输入和检测功能 -->
@@ -54,13 +105,28 @@ frontend/
             <div class="panel" id="document-panel">
                 <!-- 文件上传和检测功能 -->
             </div>
+            
+            <!-- 词库管理面板 -->
+            <div class="panel" id="libraries-panel">
+                <!-- 词库管理功能 -->
+            </div>
         </main>
-        
-        <!-- 加载遮罩 -->
+
+        <!-- 加载状态 -->
         <div class="loading-overlay" id="loading-overlay">
-            <!-- 加载动画 -->
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p>正在检测中，请稍候...</p>
+            </div>
         </div>
+
+        <!-- 底部 -->
+        <footer class="footer">
+            <p>&copy; 2025 敏感词检测系统. 智能文本内容安全检测平台</p>
+        </footer>
     </div>
+
+    <script src="/static/script.js"></script>
 </body>
 </html>
 ```

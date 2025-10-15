@@ -259,7 +259,7 @@ model_warm_up_status = {
 }
 
 
-# ---------------------- 三步匹配规则引擎 ----------------------
+# ---------------------- 双重匹配规则引擎 ----------------------
 
 # 第一步：AC自动机初筛 - 快速过滤无风险文本，标记可疑文本
 class ACNode:
@@ -531,7 +531,7 @@ class ThreeStepFilter:
             self.ac_automaton = ACAutomaton(self.words)
             self.dfa_filter = DFAFilter(self.words)
 
-    def detect(self, text, fast_mode=False):
+    def detect(self, text):
         """规则匹配检测（预处理+AC+DFA）"""
         start_time = time.time()
         
@@ -562,7 +562,6 @@ class ThreeStepFilter:
             'all_results': all_results,
             'suspicious_segments': suspicious_segments,
             'word_count': len(self.words),  # 添加词库统计信息
-            'fast_mode': fast_mode,  # 是否使用快速模式
             'normalized_text': normalized_text,  # 归一化后的文本
             'timing': {
                 'preprocess_time': round(preprocess_time * 1000, 2),  # 预处理用时
@@ -572,7 +571,7 @@ class ThreeStepFilter:
             }
         }
 
-# 初始化三步匹配规则引擎（加载敏感词库）
+# 初始化双重匹配规则引擎（加载敏感词库）
 # 默认使用word_libraries中的词库
 
 # 模型预热函数
@@ -589,16 +588,16 @@ def call_ollama_api(text: str) -> str:
     
     # 检查是否是冷启动
     if not model_warm_up_status["is_warmed_up"]:
-        print("⚠️  检测到模型冷启动，可能需要较长时间...")
+        print("检测到模型冷启动，可能需要较长时间...")
     elif model_warm_up_status["warm_up_time"]:
         time_since_warmup = call_start_time - model_warm_up_status["warm_up_time"]
         if time_since_warmup > 300:  # 5分钟后认为可能冷启动
-            print(f"⚠️  距离预热已过{time_since_warmup:.0f}秒，可能触发冷启动...")
+            print(f"距离预热已过{time_since_warmup:.0f}秒，可能触发冷启动...")
     
     # Ollama API 地址与模型名通过环境变量配置
     # 在WSL环境中，使用host.docker.internal可能无法解析，尝试多种方式
     base_url = os.getenv("OLLAMA_BASE_URL", "http://172.17.0.1:11434").rstrip("/")
-    model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct-q4_K_M")
+    model_name = os.getenv("OLLAMA_MODEL", "qwen3:8b-q4_K_M")
     ollama_url = f"{base_url}/api/generate"
     
     print(f"尝试调用Ollama API: {ollama_url}")
@@ -673,22 +672,14 @@ def warm_up_model():
     try:
         print("正在预热Ollama模型...")
         
-        # 多次预热，确保模型完全加载
-        warm_up_texts = [
-            "这是一个测试文本，用于预热模型。",
-            "今天天气很好，适合出门散步。",
-            "请帮我分析一下这个文本的内容。"
-        ]
+        # 单次预热，快速启动模型
+        warm_up_text = "这是一个测试文本，用于预热模型。"
         
-        for i, text in enumerate(warm_up_texts, 1):
-            print(f"预热第{i}次...")
-            result = call_ollama_api(text)
-            print(f"第{i}次预热完成，结果: {result}")
-            
-            # 短暂延迟，让模型稳定
-            time.sleep(0.5)
+        print("预热中...")
+        result = call_ollama_api(warm_up_text)
+        print(f"预热完成，结果: {result}")
         
-        print("模型预热全部完成！")
+        print("模型预热完成！")
         
         # 更新预热状态
         model_warm_up_status["is_warmed_up"] = True
@@ -757,7 +748,6 @@ three_step_filter = initialize_detection_filter()
 class TextRequest(BaseModel):
     """文本检测的请求体格式：必须包含text字段"""
     text: str
-    fast_mode: Optional[bool] = False  # 快速模式：已废弃，建议使用默认模式
     strict_mode: Optional[bool] = False  # 严格模式：跳过规则匹配，直接使用大模型
 
 class LibraryCreateRequest(BaseModel):
@@ -918,7 +908,7 @@ async def detect_text(req: TextRequest):
         raise HTTPException(status_code=400, detail="检测文本不能为空")
     
     # 调试日志
-    print(f"🔍 调试信息: strict_mode={req.strict_mode}, fast_mode={req.fast_mode}")
+    print(f"🔍 调试信息: strict_mode={req.strict_mode}")
     
     # 2. 检查是否为严格模式
     if req.strict_mode:
@@ -953,7 +943,7 @@ async def detect_text(req: TextRequest):
         }
     
     # 3. 普通模式：使用规则匹配快速筛选 + 存疑内容大模型检测
-    rule_result = three_step_filter.detect(req.text, fast_mode=req.fast_mode)
+    rule_result = three_step_filter.detect(req.text)
     
     # 4. 判断是否需要大模型检测（规则匹配快速筛选 + 存疑内容大模型检测）
     rule_has_sensitive = bool(rule_result['all_results'])  # 规则匹配是否发现敏感词

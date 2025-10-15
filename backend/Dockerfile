@@ -34,7 +34,7 @@ RUN chmod +x /app/start.sh
 # 环境变量
 ENV PYTHONUNBUFFERED=1
 ENV OLLAMA_BASE_URL=http://ollama:11434
-ENV OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
+ENV OLLAMA_MODEL=qwen3:8b-q4_K_M
 ENV HEALTH_CHECK_ENABLED=true
 
 # 健康检查（仅检查应用服务）

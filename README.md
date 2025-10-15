@@ -1,6 +1,6 @@
-# 敏感词检测系统
+# 敏感词检测系统 v1.0.0
 
-一个基于 FastAPI + Ollama 的智能敏感词检测系统，支持文本和文档检测，具备规则匹配和大语言模型双重检测能力。
+一个基于 FastAPI + Ollama 的智能敏感词检测系统，支持文本和文档检测，具备双重匹配规则引擎和大语言模型智能检测能力。
 
 项目已上传 https://github.com/martingoodmorning/sensitive-detector-v1.0.0.git
 
@@ -8,6 +8,7 @@
 
 - [项目概述](#项目概述)
 - [技术架构](#技术架构)
+- [项目结构](#项目结构)
 - [功能特性](#功能特性)
 - [快速开始](#快速开始)
 - [API 文档](#api-文档)
@@ -29,7 +30,7 @@
 - **实时检测**：毫秒级响应时间。单个语句正常响应时间约5ms，存疑内容单次响应时间约450ms，连续响应时间约150ms，适用于实时性要求高场景。
 - **支持严格模式**：取消规则匹配快速预筛，所有输入均使用大模型检测，适用于检测率要求高的场景。
 - **敏感词库管理**：支持敏感词库选择、构建、编辑、移除等功能，操作简洁友好。
-- **大模型优化**：LLM使用Qwen7B INT4量化模型
+- **大模型优化**：LLM使用Qwen3:8B Q4_K_M量化模型
 - **Web界面**：简洁美观的 Web 界面
 - **容器化部署**：Docker 一键部署
 
@@ -40,7 +41,7 @@
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   前端界面      │    │   后端 API      │    │   Ollama LLM    │
-│   (HTML/CSS/JS) │◄──►│   (FastAPI)     │◄──►│   (qwen2.5:7b)  │
+│   (HTML/CSS/JS) │◄──►│   (FastAPI)     │◄──►│   (qwen3:8b)    │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          │                       │                       │
@@ -77,13 +78,52 @@
 
 #### AI 技术
 - **Ollama**: 本地 LLM 运行环境
-- **Qwen2.5:7b**: 通义千问 2.5 版本 7B 参数模型（量化版本）
+- **Qwen3:8b**: 通义千问 3 版本 8B 参数模型（量化版本）
 - **Prompt Engineering**: 提示词工程优化
 
 #### 部署技术
 - **Docker**: 容器化部署
 - **Docker Compose**: 多容器编排
 - **WSL**: Windows 子系统 Linux
+
+## 📁 项目结构
+
+```
+sensitive-detector/
+├── backend/                    # 后端服务
+│   ├── main.py                # FastAPI 主应用
+│   ├── start.sh               # 启动脚本
+│   ├── Dockerfile             # Docker 镜像配置
+│   └── requirements.txt       # Python 依赖
+├── frontend/                   # 前端界面
+│   ├── index.html             # 主页面
+│   ├── style.css              # 样式文件
+│   └── script.js              # JavaScript 逻辑
+├── docs/                       # 技术文档
+│   ├── PROJECT_STRUCTURE.md    # 项目结构文档
+│   ├── API.md                 # API 接口文档
+│   ├── ARCHITECTURE.md        # 系统架构文档
+│   ├── BACKEND.md             # 后端技术文档
+│   ├── FRONTEND.md            # 前端技术文档
+│   ├── TROUBLESHOOTING.md     # 故障排除指南
+│   ├── RULE_MATCHING_ENGINE.md # 规则匹配引擎文档
+│   └── WORD_LIBRARY_SELECTION.md # 词库选择文档
+├── word_libraries/             # 敏感词库
+│   ├── 政治类型.txt
+│   ├── 色情类型.txt
+│   ├── 暴恐词库.txt
+│   └── ...                    # 其他词库文件
+├── demo/                       # 演示样本
+│   ├── normal_samples/         # 正常文本样本
+│   └── sensitive_samples/      # 敏感文本样本
+├── data/                       # 数据存储
+│   └── ollama/                # Ollama 模型数据
+├── docker-compose.yml          # Docker 编排配置
+├── detection_config.json       # 检测配置
+├── LICENSE                     # 开源许可证
+├── README.md                   # 项目说明
+└── VERSION                     # 版本信息
+```
 
 ## ✨ 功能特性
 
@@ -190,8 +230,9 @@ graph TD
 ### 环境要求
 
 - Docker & Docker Compose
-- 8GB+ 内存 (运行 qwen2.5:7b 量化模型)
+- 8GB+ 内存 (运行 qwen3:8b 量化模型)
 - 20GB+ 磁盘空间
+- GPU支持（可选，用于加速推理）
 
 ### 一键启动
 
@@ -200,25 +241,81 @@ graph TD
 git clone https://github.com/martingoodmorning/sensitive-detector-v1.0.0.git
 cd sensitive-detector
 
-# 2. 一键启动所有服务
-docker-compose up -d
+# 2. 一键启动
+docker-compose up
 
-# 3. 等待服务启动（首次启动需要下载模型，约5-10分钟）
-# 查看启动进度
-# docker-compose logs -f
-
-# 4. 访问系统
+# 3. 访问系统
 # 前端界面: http://localhost:8000
 # API 文档: http://localhost:8000/api/docs
 # 健康检查: http://localhost:8000/health
 ```
 
-**系统会自动**：
-- ✅ 拉取 Ollama 镜像
-- ✅ 启动 Ollama 服务
-- ✅ 检查并下载 Qwen 模型
-- ✅ 启动应用服务
-- ✅ 进行模型预热
+### 查看模型状态
+
+```bash
+# 查看已下载的模型
+curl -s http://localhost:11434/api/tags | jq '.models[].name'
+
+# 查看模型详细信息
+curl -s http://localhost:11434/api/tags | jq .
+
+# 在容器内查看模型
+docker exec ollama-service ollama list
+```
+
+**首次启动时系统会自动**：
+- ✅ 检查 Ollama 服务状态
+- ✅ 检查模型是否存在
+- ✅ 如果模型不存在，自动下载 qwen3:8b-q4_K_M（~5.2GB）
+- ✅ 显示下载进度和预计时间
+- ✅ 单次预热模型（避免冷启动延迟）
+- ✅ 测试模型可用性
+- ✅ 启动 FastAPI 服务
+
+**启动过程可视化**：
+```bash
+🚀 启动敏感词检测服务...
+
+📋 系统信息：
+   模型: qwen3:8b-q4_K_M
+   Ollama地址: http://ollama:11434
+
+🔍 检查 Ollama 服务...
+✅ Ollama 服务已就绪: http://ollama:11434
+
+🔍 检查模型: qwen3:8b-q4_K_M
+⚠️  模型不存在: qwen3:8b-q4_K_M
+
+📥 正在下载模型: qwen3:8b-q4_K_M
+
+📊 模型下载信息：
+   模型名称: qwen3:8b-q4_K_M
+   参数规模: 8.2B
+   预计大小: ~5.2GB
+   预计时间: 10-30分钟（取决于网络速度）
+
+🔄 正在下载中，请耐心等待...
+   实时监控: 每5秒检查一次下载状态
+   详细日志: docker logs ollama-service -f
+   进度监控: ./scripts/monitor-download.sh
+
+✅ 模型下载成功: qwen3:8b-q4_K_M
+
+🧪 测试模型: qwen3:8b-q4_K_M
+✅ 模型测试成功
+
+🎉 系统准备完成！
+
+📊 服务状态：
+   ✅ Ollama服务: 已就绪
+   ✅ 模型: qwen3:8b-q4_K_M
+   ✅ 服务地址: http://ollama:11434
+
+🌐 启动 FastAPI 应用...
+   前端界面: http://localhost:8000
+   API文档: http://localhost:8000/api/docs
+   健康检查: http://localhost:8000/health
+```
 
 详细部署说明请参考 [部署指南](#部署指南)。
 
@@ -329,7 +426,7 @@ docker-compose up -d
 
 **获取模型状态**: `GET /model-status`
 
-**预热模型**: `POST /warm-up-model`
+**预热模型**: `POST /warm-up-model` 
 
 #### 5. 健康检查
 
@@ -428,7 +525,7 @@ docker-compose up -d
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
 | `OLLAMA_BASE_URL` | `http://ollama:11434` | Ollama 服务地址（容器内） |
-| `OLLAMA_MODEL` | `qwen2.5:7b-instruct-q4_K_M` | 使用的 LLM 模型（推荐量化版本） |
+| `OLLAMA_MODEL` | `qwen3:8b-q4_K_M` | 使用的 LLM 模型（推荐量化版本） |
 | `CORS_ALLOW_ORIGINS` | `*` | CORS 允许的源 |
 | `PYTHONUNBUFFERED` | `1` | Python 输出缓冲 |
 | `HEALTH_CHECK_ENABLED` | `true` | 启用健康检查 |
@@ -481,7 +578,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
+      - OLLAMA_MODEL=qwen3:8b-q4_K_M
       - CORS_ALLOW_ORIGINS=*
       - HEALTH_CHECK_ENABLED=true
     depends_on:
@@ -526,22 +623,12 @@ volumes:
 
 ### 量化模型配置
 
-**推荐使用量化的Qwen模型以提升性能：**
-
-| 模型 | 大小 | 内存占用 | 适用场景 |
-|------|------|----------|----------|
-| `qwen2.5:7b-instruct-q4_K_M` | ~4.1GB | ~6GB | 生产环境（推荐） |
-| `qwen2.5:3b-instruct-q4_K_M` | ~1.9GB | ~3GB | 开发测试 |
-| `qwen2.5:1.5b-instruct-q4_K_M` | ~0.9GB | ~2GB | 资源受限环境 |
-
 
 **下载量化模型：**
 ```bash
-# 推荐使用7B INT4量化版本
-ollama pull qwen2.5:7b-instruct-q4_K_M
+# 推荐使用Qwen3 8B INT4量化版本
+ollama pull qwen3:8b-q4_K_M
 
-# 或使用更轻量的3B版本
-ollama pull qwen2.5:3b-instruct-q4_K_M
 ```
 
 详细配置请参考：[生产环境部署指南](docs/PRODUCTION_DEPLOYMENT.md)
@@ -594,7 +681,7 @@ ollama pull qwen2.5:3b-instruct-q4_K_M
    docker-compose exec ollama curl -I https://ollama.ai
    
    # 手动下载模型
-   docker-compose exec ollama ollama pull qwen2.5:7b-instruct-q4_K_M
+   docker-compose exec ollama ollama pull qwen3:8b-q4_K_M
    ```
 
 3. **服务健康检查失败**
@@ -627,13 +714,10 @@ ollama pull qwen2.5:3b-instruct-q4_K_M
 git clone https://github.com/martingoodmorning/sensitive-detector-v1.0.0.git
 cd sensitive-detector
 
-# 2. 启动所有服务
-docker-compose up -d
+# 2. 一键启动
+docker-compose up
 
-# 3. 监控启动过程
-docker-compose logs -f
-
-# 4. 访问系统
+# 3. 访问系统
 # 浏览器打开: http://localhost:8000
 ```
 
@@ -642,7 +726,7 @@ docker-compose logs -f
 - **操作系统**: Linux (Ubuntu 20.04+ 推荐) 或 Windows WSL
 - **Docker**: 20.10+ 
 - **Docker Compose**: 2.0+
-- **内存**: 16GB+ (推荐 32GB，运行 qwen2.5:7b 量化模型)
+- **内存**: 16GB+ (推荐 32GB，运行 qwen3:8b 量化模型)
 - **磁盘**: 20GB+ 可用空间
 
 ### 服务架构
@@ -687,7 +771,7 @@ docker-compose logs -f
    docker-compose exec ollama ollama list
    
    # 下载新模型
-   docker-compose exec ollama ollama pull qwen2.5:3b-instruct-q4_K_M
+   docker-compose exec ollama ollama pull qwen3:8b-q4_K_M
    
    # 删除模型
    docker-compose exec ollama ollama rm qwen2.5:7b-instruct-q4_K_M
@@ -723,6 +807,18 @@ docker-compose logs -f
    docker volume rm sensitive-detector_ollama_data
    ```
 
+7. **模型下载进度监控**
+   ```bash
+   # 查看敏感词检测服务日志
+   docker logs sensitive-detector -f
+   
+   # 查看Ollama服务日志
+   docker logs ollama-service -f
+   
+   # 检查模型是否已下载
+   docker exec ollama-service ollama list
+   ```
+
 ### 健康检查
 
 - **应用健康检查**: http://localhost:8000/health
@@ -749,7 +845,7 @@ docker-compose logs -f
    
    # 4. 启动 Ollama
    ollama serve &
-   ollama pull qwen2.5:7b-instruct-q4_K_M
+   ollama pull qwen3:8b-q4_K_M
    
    # 5. 启动后端服务
    cd backend
@@ -819,9 +915,13 @@ docker-compose logs -f
 
 ### 详细文档
 
-- **[生产环境部署指南](docs/PRODUCTION_DEPLOYMENT.md)** - 详细的生产环境部署说明
+- **[项目结构文档](docs/PROJECT_STRUCTURE.md)** - 完整的项目结构和技术栈说明
 - **[API 文档](docs/API.md)** - 完整的 API 接口文档
 - **[系统架构文档](docs/ARCHITECTURE.md)** - 系统架构设计说明
+- **[后端技术文档](docs/BACKEND.md)** - 后端实现技术文档
+- **[前端技术文档](docs/FRONTEND.md)** - 前端实现技术文档
+- **[规则匹配引擎](docs/RULE_MATCHING_ENGINE.md)** - 规则匹配算法文档
+- **[词库选择指南](docs/WORD_LIBRARY_SELECTION.md)** - 敏感词库选择和使用
 - **[故障排除指南](docs/TROUBLESHOOTING.md)** - 常见问题解决方案
 
 ### 快速参考

@@ -10,18 +10,21 @@ services:
       - ollama_data:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_NUM_PARALLEL=2
+      - OLLAMA_NUM_PARALLEL=1
       - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_KEEP_ALIVE=5m
+      - OLLAMA_GPU_MEMORY_FRACTION=0.8
     restart: unless-stopped
     runtime: nvidia
     deploy:
       resources:
         limits:
-          memory: 16G
-          cpus: '12.0'
+          memory: 12G
+          cpus: '8.0'
         reservations:
-          memory: 8G
-          cpus: '6.0' 
+          memory: 6G
+          cpus: '4.0' 
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 30s
@@ -45,7 +48,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
+      - OLLAMA_MODEL=qwen3:8b-q4_K_M
       - CORS_ALLOW_ORIGINS=*
       - HEALTH_CHECK_ENABLED=true
     depends_on:

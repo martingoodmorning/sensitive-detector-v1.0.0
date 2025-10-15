@@ -1,8 +1,11 @@
-# 后端技术文档
+# 后端技术文档 v1.0.0
+
+**版本**: v1.0.0  
+**更新时间**: 2025年10月
 
 ## 概述
 
-敏感词检测系统后端基于 FastAPI 框架构建，提供高性能的 RESTful API 服务。系统集成了传统的敏感词匹配算法和大语言模型，实现双重检测机制，确保检测结果的准确性和可靠性。
+敏感词检测系统后端基于 FastAPI 框架构建，提供高性能的 RESTful API 服务。系统集成了双重匹配规则引擎和大语言模型，实现双重检测机制，确保检测结果的准确性和可靠性。
 
 ## 技术架构
 
@@ -38,10 +41,11 @@
 
 ```
 backend/
-├── main.py                 # 主应用文件
-├── requirements.txt        # Python 依赖
+├── main.py                 # FastAPI 主应用 (1242行)
+├── start.sh               # 启动脚本 (244行)
 ├── Dockerfile             # Docker 构建文件
-└── word_libraries/         # 敏感词库目录
+├── requirements.txt        # Python 依赖
+└── __pycache__/           # Python 缓存目录
 ```
 
 ## 核心文件详解
@@ -96,8 +100,10 @@ app.mount("/static", StaticFiles(directory="/app/frontend"), name="static")
 #### 数据模型
 
 ```python
-class TextDetectionRequest(BaseModel):
+class TextRequest(BaseModel):
+    """文本检测的请求体格式：必须包含text字段"""
     text: str
+    strict_mode: Optional[bool] = False  # 严格模式：跳过规则匹配，直接使用大模型
 
 class DetectionResponse(BaseModel):
     success: bool
@@ -163,35 +169,41 @@ class SensitiveWordDetector:
 ```python
 def call_ollama_api(text: str) -> str:
     """调用 Ollama API 进行 LLM 检测"""
-    base_url = os.getenv("OLLAMA_BASE_URL", "http://172.20.0.1:11434").rstrip("/")
-    model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct-q4_K_M")
+    base_url = os.getenv("OLLAMA_BASE_URL", "http://172.17.0.1:11434").rstrip("/")
+    model_name = os.getenv("OLLAMA_MODEL", "qwen3:8b-q4_K_M")
     ollama_url = f"{base_url}/api/generate"
     
-    # 优化的提示词
+    # 提示词工程：严格约束输出，确保一致性
     prompt = f"""
-    你是专业的内容安全检测系统。请严格按照以下规则进行判断：
+你是专业的内容安全检测系统。请严格按照以下规则进行判断：
 
-    【敏感内容标准】
-    必须同时满足以下条件才判定为敏感：
-    1. 包含明确的辱骂词汇（如：白痴、傻逼、去死等）
-    2. 包含暴力威胁（如：杀了你、打你、伤害等）
-    3. 包含违法内容（如：毒品、犯罪、违法等）
-    4. 包含色情内容（如：性暗示、色情描述等）
-    5. 包含歧视内容（如：种族歧视、性别歧视等）
+【敏感内容标准】
+包含以下任何一类内容即判定为敏感：
+1. 辱骂词汇（如：白痴、傻逼、去死等）
+2. 暴力威胁（如：杀了你、打你、伤害等）
+3. 违法内容（如：毒品、犯罪、诈骗等）
+4. 色情内容（如：性暗示、色情描述等）
+5. 歧视内容（如：种族歧视、性别歧视等）
+6. 政治敏感内容（如：法西斯、纳粹、极端主义、恐怖主义、分裂主义等）
+7. 仇恨言论（如：煽动仇恨、暴力、极端的言论）
+8. 虚假信息（如：虚假新闻、虚假宣传、虚假广告、谣言等）
+9. 欺凌言论（如：霸凌、冷暴力、孤立的言论）
+10. 隐蔽的敏感内容（如：反动内容、色情内容、暴力内容、违法内容等，但需要通过上下文才能判断）
 
-    【检测文本】
-    {text[:500]}
+【检测文本】
+{text[:10000]}
 
-    【判断规则】
-    - 如果文本明显包含上述任何一类敏感内容，回答：敏感
-    - 如果文本是正常的日常对话、描述、询问等，回答：正常
-    - 对于模糊边界的内容，倾向于判定为正常
+【判断规则】
+- 如果文本包含上述任何一类敏感内容，回答：敏感
+- 如果文本是正常的日常对话、学术讨论、新闻描述等，回答：正常
+- 对于涉及敏感词汇但属于学术研究、历史讨论、新闻报道等正当用途，回答：正常
+- 对于明确表达支持、宣扬、美化敏感内容的，回答：敏感
 
-    【输出要求】
-    请严格按照以下格式输出，不要添加任何其他内容：
-    敏感
-    或
-    正常
+【输出要求】
+请严格按照以下格式输出，不要添加任何其他内容：
+敏感
+或
+正常
     """
     
     try:
@@ -217,6 +229,41 @@ def call_ollama_api(text: str) -> str:
         print(f"Ollama API 调用异常：{e}")
         return "正常"
 ```
+
+#### 模型预热机制
+
+系统启动时会自动进行模型预热，避免首次调用时的冷启动延迟：
+
+```python
+def warm_up_model():
+    """预热Ollama模型，避免第一次调用时的冷启动延迟"""
+    try:
+        print("正在预热Ollama模型...")
+        
+        # 单次预热，快速启动模型
+        warm_up_text = "这是一个测试文本，用于预热模型。"
+        
+        print("预热中...")
+        result = call_ollama_api(warm_up_text)
+        print(f"预热完成，结果: {result}")
+        
+        print("模型预热完成！")
+        
+        # 更新预热状态
+        model_warm_up_status["is_warmed_up"] = True
+        model_warm_up_status["warm_up_time"] = time.time()
+        
+        return True
+    except Exception as e:
+        print(f"模型预热失败: {e}")
+        return False
+```
+
+**预热特点**：
+- **单次预热**: 只需1次API调用，快速启动
+- **自动执行**: 系统启动时自动进行预热
+- **状态跟踪**: 记录预热状态和时间
+- **错误处理**: 预热失败不影响系统启动
 
 #### 文档解析服务
 
@@ -257,31 +304,59 @@ def extract_text_from_file(file: UploadFile) -> str:
 **1. 文本检测端点**:
 ```python
 @app.post("/detect/text", response_model=DetectionResponse)
-async def detect_text(request: TextDetectionRequest):
+async def detect_text(req: TextRequest):
     """文本敏感词检测"""
     try:
-        text = request.text.strip()
+        text = req.text.strip()
         if not text:
-            raise HTTPException(status_code=400, detail="文本内容不能为空")
+            raise HTTPException(status_code=400, detail="检测文本不能为空")
         
-        # 规则匹配检测
-        rule_detected = detector.detect(text)
+        # 检查是否为严格模式
+        if req.strict_mode:
+            # 严格模式：跳过规则匹配，直接使用大模型检测
+            llm_result = call_ollama_api(text)
+        return {
+            "text": text,
+            "is_sensitive": llm_result == "敏感",
+            "rule_detected": [],
+            "llm_detected": llm_result,
+            "detection_time": 0,
+            "strict_mode": True
+        }
         
-        # LLM 检测
-        llm_detected = call_ollama_api(text)
+        # 普通模式：使用规则匹配快速筛选 + 存疑内容大模型检测
+        rule_result = three_step_filter.detect(text)
         
-        # 结果整合
-        final_result = "敏感" if rule_detected or llm_detected == "敏感" else "正常"
+        # 判断是否需要大模型检测
+        rule_has_sensitive = bool(rule_result['all_results'])
         
-        return DetectionResponse(
-            success=True,
-            data={
-                "original_text": text,
-                "rule_detected": rule_detected if rule_detected else "正常",
-                "llm_detected": llm_detected,
-                "final_result": final_result
+        if rule_has_sensitive:
+            # 仅对规则匹配出敏感词的文本进行大模型检测
+            llm_result = call_ollama_api(text)
+            final_result = llm_result
+        else:
+            # 规则匹配无敏感词，直接判定为正常
+            llm_result = "正常"
+            final_result = "正常"
+        
+        return {
+            "status": "success",
+            "data": {
+                "original_text": text[:100] + "..." if len(text) > 100 else text,
+                "rule_detection": {
+                    "ac_results": rule_result['ac_results'],
+                    "dfa_results": rule_result['dfa_results'],
+                    "all_results": rule_result['all_results'],
+                    "suspicious_segments": rule_result['suspicious_segments'],
+                    "word_count": rule_result['word_count'],
+                    "normalized_text": rule_result['normalized_text'],
+                    "timing": rule_result['timing']
+                },
+                "llm_detected": llm_result,
+                "final_result": final_result,
+                "detection_flow": "rule_only" if not rule_has_sensitive else "rule_then_llm"
             }
-        )
+        }
         
     except HTTPException:
         raise
@@ -318,26 +393,27 @@ async def detect_document(file: UploadFile = File(...)):
         if not text.strip():
             raise HTTPException(status_code=400, detail="文档内容为空")
         
-        # 规则匹配检测
-        rule_detected = detector.detect(text)
+        # 文档检测：使用严格模式（直接使用大模型检测）
+        # 文本预处理（归一化字符格式）
+        preprocessor = TextPreprocessor()
+        normalized_text = preprocessor.preprocess_text(text)
         
-        # LLM 检测
-        llm_detected = call_ollama_api(text)
+        # 使用预处理后的文本进行LLM检测
+        llm_result = call_ollama_api(normalized_text)
+        final_result = llm_result
         
-        # 结果整合
-        final_result = "敏感" if rule_detected or llm_detected == "敏感" else "正常"
-        
-        return DetectionResponse(
-            success=True,
-            data={
+        return {
+            "status": "success",
+            "data": {
                 "filename": file.filename,
                 "file_type": file.content_type.split("/")[-1],
                 "text_length": len(text),
-                "rule_detected": rule_detected if rule_detected else "正常",
-                "llm_detected": llm_detected,
-                "final_result": final_result
+                "normalized_text": normalized_text,
+                "llm_detected": llm_result,
+                "final_result": final_result,
+                "detection_flow": "strict_mode"
             }
-        )
+        }
         
     except HTTPException:
         raise
@@ -401,41 +477,12 @@ async def read_docs():
 ### LLM 智能检测
 
 **模型选择**:
-- **Qwen2.5:7b**: 通义千问 2.5 版本 7B 参数模型（量化版本）
+- **Qwen3:8b**: 通义千问 3 版本 8 B 参数模型（量化版本）
 - **本地部署**: 使用 Ollama 框架
 - **一致性优化**: temperature=0 确保输出一致
 
-**提示词工程**:
-```python
-prompt = f"""
-你是专业的内容安全检测系统。请严格按照以下规则进行判断：
-
-【敏感内容标准】
-必须同时满足以下条件才判定为敏感：
-1. 包含明确的辱骂词汇（如：白痴、傻逼、去死等）
-2. 包含暴力威胁（如：杀了你、打你、伤害等）
-3. 包含违法内容（如：毒品、犯罪、违法等）
-4. 包含色情内容（如：性暗示、色情描述等）
-5. 包含歧视内容（如：种族歧视、性别歧视等）
-
-【检测文本】
-{text[:500]}
-
-【判断规则】
-- 如果文本明显包含上述任何一类敏感内容，回答：敏感
-- 如果文本是正常的日常对话、描述、询问等，回答：正常
-- 对于模糊边界的内容，倾向于判定为正常
-
-【输出要求】
-请严格按照以下格式输出，不要添加任何其他内容：
-敏感
-或
-正常
-"""
-```
-
 **检测流程**:
-1. 文本预处理：截取前500字符
+1. 文本预处理：截取前10000字符
 2. 提示词构建：包含检测规则和文本
 3. API 调用：发送到 Ollama 服务
 4. 结果解析：提取检测结果
@@ -496,9 +543,7 @@ prompt = f"""
 
 1. **异步处理**:
    ```python
-   async def detect_text_async(request: TextDetectionRequest):
-       # 异步处理检测逻辑
-       pass
+   # 异步处理检测逻辑已在主API中实现
    ```
 
 2. **连接池**:
@@ -645,9 +690,11 @@ except Exception as e:
    app.state.limiter = limiter
    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
    
+   # 速率限制示例
    @app.post("/detect/text")
    @limiter.limit("10/minute")
-   async def detect_text(request: Request, ...):
+   async def detect_text_with_rate_limit(request: Request, ...):
+       # 速率限制的检测端点
        pass
    ```
 
@@ -771,7 +818,7 @@ python-multipart==0.0.6
 ```bash
 # Ollama 配置
 OLLAMA_BASE_URL=http://172.20.0.1:11434
-OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
+OLLAMA_MODEL=qwen3:8b-q4_K_M
 
 # 应用配置
 PYTHONUNBUFFERED=1
