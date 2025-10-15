@@ -28,7 +28,7 @@
 - **实时检测**：毫秒级响应时间。单个语句正常响应时间约5ms，存疑内容单次响应时间约450ms，连续响应时间约150ms，适用于实时性要求高场景。
 - **支持严格模式**：取消规则匹配快速预筛，所有输入均使用大模型检测，适用于检测率要求高的场景。
 - **敏感词库管理**：支持敏感词库选择、构建、编辑、移除等功能，操作简洁友好。
-- **大模型优化**：LLM使用Qwen3:8B Q4_K_M量化模型
+- **大模型优化**：LLM使用Qwen2.5:7B Q4_K_M量化模型
 - **Web界面**：简洁美观的 Web 界面
 - **容器化部署**：Docker 一键部署
 
@@ -39,7 +39,7 @@
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   前端界面      │    │   后端 API      │    │   Ollama LLM    │
-│   (HTML/CSS/JS) │◄──►│   (FastAPI)     │◄──►│   (qwen3:8b)    │
+│   (HTML/CSS/JS) │◄──►│   (FastAPI)     │◄──►│   (qwen2.5:7b)   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          │                       │                       │
@@ -76,7 +76,7 @@
 
 #### 大模型技术
 - **Ollama**: 本地 LLM 运行环境
-- **Qwen3:8b**: 通义千问 3 版本 8B 参数模型（量化版本）
+- **Qwen3:8b**: 通义千问 2.5 版本 7B 参数模型（量化版本）
 - **Prompt Engineering**: 提示词工程优化
 
 #### 部署技术
@@ -228,7 +228,7 @@ graph TD
 ### 环境要求
 
 - Docker & Docker Compose
-- 8GB+ 内存 (运行 qwen3:8b 量化模型)
+- 8GB+ 内存 (运行 qwen2.5:7b 量化模型)
 - 20GB+ 磁盘空间
 - GPU支持（可选，用于加速推理）
 
@@ -264,55 +264,12 @@ docker exec ollama-service ollama list
 **首次启动时系统会自动**：
 - ✅ 检查 Ollama 服务状态
 - ✅ 检查模型是否存在
-- ✅ 如果模型不存在，自动下载 qwen3:8b-q4_K_M（~5.2GB）
+- ✅ 如果模型不存在，自动下载 qwen2.5:7b-instruct-q4_K_M（~4.7GB）
 - ✅ 显示下载进度和预计时间
 - ✅ 单次预热模型（避免冷启动延迟）
 - ✅ 测试模型可用性
 - ✅ 启动 FastAPI 服务
 
-**启动过程可视化**：
-```bash
-🚀 启动敏感词检测服务...
-
-📋 系统信息：
-   模型: qwen3:8b-q4_K_M
-   Ollama地址: http://ollama:11434
-
-🔍 检查 Ollama 服务...
-✅ Ollama 服务已就绪: http://ollama:11434
-
-🔍 检查模型: qwen3:8b-q4_K_M
-⚠️  模型不存在: qwen3:8b-q4_K_M
-
-📥 正在下载模型: qwen3:8b-q4_K_M
-
-📊 模型下载信息：
-   模型名称: qwen3:8b-q4_K_M
-   参数规模: 8.2B
-   预计大小: ~5.2GB
-   预计时间: 10-30分钟（取决于网络速度）
-
-🔄 正在下载中，请耐心等待...
-   实时监控: 每5秒检查一次下载状态
-   详细日志: docker logs ollama-service -f
-   进度监控: ./scripts/monitor-download.sh
-
-✅ 模型下载成功: qwen3:8b-q4_K_M
-
-🧪 测试模型: qwen3:8b-q4_K_M
-✅ 模型测试成功
-
-🎉 系统准备完成！
-
-📊 服务状态：
-   ✅ Ollama服务: 已就绪
-   ✅ 模型: qwen3:8b-q4_K_M
-   ✅ 服务地址: http://ollama:11434
-
-🌐 启动 FastAPI 应用...
-   前端界面: http://localhost:8000
-   API文档: http://localhost:8000/api/docs
-   健康检查: http://localhost:8000/health
 ```
 
 详细部署说明请参考 [部署指南](#部署指南)。
@@ -523,12 +480,12 @@ docker exec ollama-service ollama list
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
 | `OLLAMA_BASE_URL` | `http://ollama:11434` | Ollama 服务地址（容器内） |
-| `OLLAMA_MODEL` | `qwen3:8b-q4_K_M` | 使用的 LLM 模型（推荐量化版本） |
+| `OLLAMA_MODEL` | `qwen2.5:7b-instruct-q4_K_M` | 使用的 LLM 模型（推荐量化版本） |
 | `CORS_ALLOW_ORIGINS` | `*` | CORS 允许的源 |
 | `PYTHONUNBUFFERED` | `1` | Python 输出缓冲 |
 | `HEALTH_CHECK_ENABLED` | `true` | 启用健康检查 |
 | `OLLAMA_HOST` | `0.0.0.0` | Ollama 服务监听地址 |
-| `OLLAMA_NUM_PARALLEL` | `2` | Ollama 并行请求数 |
+| `OLLAMA_NUM_PARALLEL` | `1` | Ollama 并行请求数 |
 | `OLLAMA_MAX_LOADED_MODELS` | `1` | Ollama 最大加载模型数 |
 
 ### Docker 配置
@@ -536,27 +493,32 @@ docker exec ollama-service ollama list
 
 ```yaml
 services:
+  # Ollama 服务（生产环境独立容器）
   ollama:
     image: ollama/ollama:latest
     container_name: ollama-service
     ports:
       - "11434:11434"
     volumes:
+      # 模型数据持久化
       - ollama_data:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_NUM_PARALLEL=2
+      - OLLAMA_NUM_PARALLEL=1
       - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_KEEP_ALIVE=5m
+      - OLLAMA_GPU_MEMORY_FRACTION=0.8
     restart: unless-stopped
     runtime: nvidia
     deploy:
       resources:
         limits:
-          memory: 16G
-          cpus: '12.0'
+          memory: 12G
+          cpus: '8.0'
         reservations:
-          memory: 8G
-          cpus: '6.0'
+          memory: 6G
+          cpus: '4.0' 
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 30s
@@ -564,19 +526,23 @@ services:
       retries: 3
       start_period: 30s
 
+  # 敏感词检测服务
   sensitive-detector:
     build: ./backend
     container_name: sensitive-detector
     ports:
       - "8000:8000"
     volumes:
+      # 静态文件目录
       - ./frontend:/app/frontend
+      # 词库管理目录
       - ./word_libraries:/app/word_libraries
+      # 检测配置文件
       - ./detection_config.json:/app/detection_config.json
     environment:
       - PYTHONUNBUFFERED=1
       - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=qwen3:8b-q4_K_M
+      - OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
       - CORS_ALLOW_ORIGINS=*
       - HEALTH_CHECK_ENABLED=true
     depends_on:
@@ -598,6 +564,7 @@ services:
       retries: 3
       start_period: 30s
 
+# 定义 volumes
 volumes:
   ollama_data:
     external: true
@@ -624,8 +591,8 @@ volumes:
 
 **下载量化模型：**
 ```bash
-# 推荐使用Qwen3 8B INT4量化版本
-ollama pull qwen3:8b-q4_K_M
+# 推荐使用Qwen2.5 7B INT4量化版本
+ollama pull qwen2.5:7b-instruct-q4_K_M
 
 ```
 
@@ -679,7 +646,7 @@ ollama pull qwen3:8b-q4_K_M
    docker-compose exec ollama curl -I https://ollama.ai
    
    # 手动下载模型
-   docker-compose exec ollama ollama pull qwen3:8b-q4_K_M
+   docker-compose exec ollama ollama pull qwen2.5:7b-instruct-q4_K_M
    ```
 
 3. **服务健康检查失败**
@@ -724,7 +691,7 @@ docker-compose up
 - **操作系统**: Linux (Ubuntu 20.04+ 推荐) 或 Windows WSL
 - **Docker**: 20.10+ 
 - **Docker Compose**: 2.0+
-- **内存**: 16GB+ (推荐 32GB，运行 qwen3:8b 量化模型)
+- **内存**: 8GB+ (推荐 16GB，运行 qwen2.5:7b 量化模型)
 - **磁盘**: 20GB+ 可用空间
 
 ### 服务架构
@@ -769,7 +736,7 @@ docker-compose up
    docker-compose exec ollama ollama list
    
    # 下载新模型
-   docker-compose exec ollama ollama pull qwen3:8b-q4_K_M
+   docker-compose exec ollama ollama pull qwen2.5:7b-instruct-q4_K_M
    
    # 删除模型
    docker-compose exec ollama ollama rm qwen2.5:7b-instruct-q4_K_M
@@ -843,7 +810,7 @@ docker-compose up
    
    # 4. 启动 Ollama
    ollama serve &
-   ollama pull qwen3:8b-q4_K_M
+   ollama pull qwen2.5:7b-instruct-q4_K_M
    
    # 5. 启动后端服务
    cd backend

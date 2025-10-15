@@ -170,7 +170,7 @@ class SensitiveWordDetector:
 def call_ollama_api(text: str) -> str:
     """调用 Ollama API 进行 LLM 检测"""
     base_url = os.getenv("OLLAMA_BASE_URL", "http://172.17.0.1:11434").rstrip("/")
-    model_name = os.getenv("OLLAMA_MODEL", "qwen3:8b-q4_K_M")
+    model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct-q4_K_M")
     ollama_url = f"{base_url}/api/generate"
     
     # 提示词工程：严格约束输出，确保一致性
@@ -818,7 +818,7 @@ python-multipart==0.0.6
 ```bash
 # Ollama 配置
 OLLAMA_BASE_URL=http://172.20.0.1:11434
-OLLAMA_MODEL=qwen3:8b-q4_K_M
+OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
 
 # 应用配置
 PYTHONUNBUFFERED=1

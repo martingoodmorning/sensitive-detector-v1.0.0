@@ -44,7 +44,7 @@ docker-compose exec ollama curl -I https://ollama.ai
 df -h
 
 # 手动下载模型
-docker-compose exec ollama ollama pull qwen3:8b-q4_K_M
+docker-compose exec ollama ollama pull qwen2.5:7b-instruct-q4_K_M
 ```
 
 #### 解决方案

@@ -7,7 +7,7 @@ set -e
 
 # 环境变量
 OLLAMA_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
-MODEL_NAME=${OLLAMA_MODEL:-qwen3:8b-q4_K_M}
+MODEL_NAME=${OLLAMA_MODEL:-qwen2.5:7b-instruct-q4_K_M}
 MAX_RETRIES=30
 RETRY_INTERVAL=2
 

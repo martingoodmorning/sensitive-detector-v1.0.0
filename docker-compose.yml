@@ -32,7 +32,7 @@ services:
       retries: 3
       start_period: 30s
 
-  # 敏感词检测服务（生产环境）
+  # 敏感词检测服务
   sensitive-detector:
     build: ./backend
     container_name: sensitive-detector
@@ -48,7 +48,7 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=qwen3:8b-q4_K_M
+      - OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
       - CORS_ALLOW_ORIGINS=*
       - HEALTH_CHECK_ENABLED=true
     depends_on:

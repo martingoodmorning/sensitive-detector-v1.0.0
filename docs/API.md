@@ -335,7 +335,7 @@ curl -X POST http://localhost:8000/warm-up-model
     "warm_up_time": 1760443927.4495397,
     "time_since_warmup": 120.5,
     "warmup_status": "active",
-    "model_name": "qwen3:8b-q4_K_M"
+    "model_name": "qwen2.5:7b-instruct-q4_K_M"
   }
 }
 ```

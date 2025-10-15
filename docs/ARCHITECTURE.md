@@ -41,7 +41,7 @@ sensitive-detector/
 │   └── ollama/                # Ollama 模型数据
 │       ├── models/            # 模型文件
 │       │   ├── qwen2.5/      # Qwen2.5 模型
-│       │   └── qwen3/        # Qwen3 模型
+│       │   └── qwen2.5/        # Qwen2.5 模型
 │       └── manifests/         # 模型清单
 ├── docker-compose.yml          # Docker 编排配置
 ├── detection_config.json       # 检测配置
@@ -420,7 +420,7 @@ graph TD
 数据存储
 ├── 模型数据 (./data/ollama/)
 │   ├── models/
-│   │   ├── qwen3:8b-q4_K_M/
+│   │   ├── qwen2.5:7b-instruct-q4_K_M/
 │   │   │   ├── model.gguf (4.1GB)
 │   │   │   ├── tokenizer.json
 │   │   │   └── config.json
