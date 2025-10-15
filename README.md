@@ -1,8 +1,6 @@
 # 敏感词检测系统 v1.0.0
 
-一个基于 FastAPI + Ollama 的智能敏感词检测系统，支持文本和文档检测，具备双重匹配规则引擎和大语言模型智能检测能力。
-
-项目已上传 https://github.com/martingoodmorning/sensitive-detector-v1.0.0.git
+一个基于 Web + FastAPI + Ollama 的智能敏感词检测系统，支持文本检测、文档检测、敏感词库管理，具备双重匹配规则引擎和大语言模型智能检测能力。
 
 ## 📋 目录
 
@@ -21,9 +19,9 @@
 
 ## 🎯 项目概述
 
-敏感词检测系统是一个现代化的内容安全检测平台，结合了传统的规则匹配算法和先进的大语言模型技术，为用户提供准确、可靠的敏感内容识别服务。
+敏感词检测系统是一个智能内容安全检测平台，结合了基于“文本预处理 + AC自动机 + DFA” 的敏感词匹配算法和先进的大语言模型技术，为用户提供快速、可靠、便捷的敏感内容识别服务。
 
-### 核心价值
+### 核心功能
 
 - **双重检测**：规则匹配快速筛选 + 存疑内容LLM智能检测
 - **多格式支持**：文本、PDF、DOCX、DOC 文档 + 图片OCR识别
@@ -76,7 +74,7 @@
 - **Fetch API**: HTTP 请求
 - **Drag & Drop API**: 文件拖拽上传
 
-#### AI 技术
+#### 大模型技术
 - **Ollama**: 本地 LLM 运行环境
 - **Qwen3:8b**: 通义千问 3 版本 8B 参数模型（量化版本）
 - **Prompt Engineering**: 提示词工程优化
@@ -91,7 +89,7 @@
 ```
 sensitive-detector/
 ├── backend/                    # 后端服务
-│   ├── main.py                # FastAPI 主应用
+│   ├── main.py                # 主应用
 │   ├── start.sh               # 启动脚本
 │   ├── Dockerfile             # Docker 镜像配置
 │   └── requirements.txt       # Python 依赖
@@ -118,7 +116,7 @@ sensitive-detector/
 │   └── sensitive_samples/      # 敏感文本样本
 ├── data/                       # 数据存储
 │   └── ollama/                # Ollama 模型数据
-├── docker-compose.yml          # Docker 编排配置
+├── docker-compose.yml          # Docker compose配置
 ├── detection_config.json       # 检测配置
 ├── LICENSE                     # 开源许可证
 ├── README.md                   # 项目说明
@@ -935,9 +933,8 @@ docker-compose up
 
 ### 联系方式
 
-- **项目维护者**: [xxx]
-- **邮箱**: [xxx]
-- **GitHub**: https://github.com/martingoodmorning/sensitive-detector-v1.0.0
+- **项目维护者**: [sai]
+- **邮箱**: [986133953@qq.com]
 
 ### 贡献指南
 
