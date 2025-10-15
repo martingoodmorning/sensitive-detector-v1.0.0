@@ -23,8 +23,7 @@ services:
           memory: 12G
           cpus: '8.0'
         reservations:
-          memory: 6G
-          cpus: '4.0' 
+          memory: 6G 
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 30s
@@ -62,7 +61,6 @@ services:
           cpus: '1.0'
         reservations:
           memory: 1G
-          cpus: '0.5'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

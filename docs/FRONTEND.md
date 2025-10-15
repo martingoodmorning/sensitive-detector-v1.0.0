@@ -715,7 +715,7 @@ document.addEventListener('DOMContentLoaded', function() {
    server {
        listen 80;
        server_name example.com;
-       root /var/www/sensitive-detector/frontend;
+       root /var/www/sensitive-detector-v1.0.0/frontend;
        index index.html;
        
        location / {
@@ -733,9 +733,9 @@ document.addEventListener('DOMContentLoaded', function() {
    ```apache
    <VirtualHost *:80>
        ServerName example.com
-       DocumentRoot /var/www/sensitive-detector/frontend
+       DocumentRoot /var/www/sensitive-detector-v1.0.0/frontend
        
-       <Directory /var/www/sensitive-detector/frontend>
+       <Directory /var/www/sensitive-detector-v1.0.0/frontend>
            AllowOverride All
            Require all granted
        </Directory>
