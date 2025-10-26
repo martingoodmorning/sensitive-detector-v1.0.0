@@ -239,13 +239,10 @@ graph TD
 git clone https://osredm.com/p41569230/sensitive-detector-v1.git
 cd sensitive-detector-v1
 
-# 2. 创建数据卷（用于模型持久化）
-docker volume create sensitive-detector_ollama_data
-
-# 3. 一键启动（首次启动会自动下载模型，请耐心等待）
+# 2. 一键启动（首次启动会自动下载模型，请耐心等待）
 docker-compose up
 
-# 4. 访问系统
+# 3. 访问系统
 # 前端界面: http://localhost:8000
 # API 文档: http://localhost:8000/api/docs
 # 健康检查: http://localhost:8000/health
@@ -576,13 +573,12 @@ services:
 # 定义 volumes
 volumes:
   ollama_data:
-    external: true
-    name: sensitive-detector_ollama_data
+    name: ollama_models
 ```
 
 **优势**：
 - ✅ 完全容器化，无需外部依赖
-- ✅ Docker管理的持久化存储
+- ✅ Docker自动管理的持久化存储
 - ✅ 跨平台兼容性好
 - ✅ 资源限制和健康检查
 - ✅ 服务依赖管理
@@ -590,7 +586,7 @@ volumes:
 - ✅ 适合生产环境部署
 
 **Docker命名卷说明**：
-- 使用Docker管理的命名卷 `sensitive-detector_ollama_data`
+- 使用Docker自动管理的命名卷 `ollama_models`
 - 模型数据存储在Docker内部，自动管理生命周期
 - 支持跨平台部署，无需担心路径问题
 - 可通过 `docker volume` 命令进行备份和管理
@@ -687,14 +683,13 @@ ollama pull qwen2.5:7b-instruct-q4_K_M
 git clone https://osredm.com/p41569230/sensitive-detector-v1.git
 cd sensitive-detector-v1
 
-# 2. 创建数据卷（用于模型持久化）
-docker volume create sensitive-detector_ollama_data
-
-# 3. 一键启动
+# 2. 一键启动（首次启动会自动下载模型，请耐心等待）
 docker-compose up
 
-# 4. 访问系统
-# 浏览器打开: http://localhost:8000
+# 3. 访问系统
+# 前端界面: http://localhost:8000
+# API 文档: http://localhost:8000/api/docs
+# 健康检查: http://localhost:8000/health
 ```
 
 ### 环境要求
@@ -771,16 +766,16 @@ docker-compose up
 6. **Docker卷管理**
    ```bash
    # 查看卷信息
-   docker volume inspect sensitive-detector_ollama_data
+   docker volume inspect ollama_models
    
    # 备份模型数据
-   docker run --rm -v sensitive-detector_ollama_data:/data -v $(pwd):/backup alpine tar czf /backup/ollama-backup.tar.gz -C /data .
+   docker run --rm -v ollama_models:/data -v $(pwd):/backup alpine tar czf /backup/ollama-backup.tar.gz -C /data .
    
    # 恢复模型数据
-   docker run --rm -v sensitive-detector_ollama_data:/data -v $(pwd):/backup alpine tar xzf /backup/ollama-backup.tar.gz -C /data
+   docker run --rm -v ollama_models:/data -v $(pwd):/backup alpine tar xzf /backup/ollama-backup.tar.gz -C /data
    
    # 删除卷（谨慎操作）
-   docker volume rm sensitive-detector_ollama_data
+   docker volume rm ollama_models
    ```
 
 7. **模型下载进度监控**
@@ -902,12 +897,14 @@ docker-compose up
 
 ### 快速参考
 
-- **部署命令**: `docker-compose up -d`
+- **部署命令**: `docker-compose up` (一键启动)
+- **后台运行**: `docker-compose up -d`
 - **健康检查**: `curl http://localhost:8000/health`
 - **API文档**: `http://localhost:8000/api/docs`
+- **前端界面**: `http://localhost:8000`
 - **服务状态**: `docker-compose ps`
 - **查看日志**: `docker-compose logs -f`
-- **卷管理**: `docker volume inspect sensitive-detector_ollama_data`
+- **卷管理**: `docker volume inspect ollama_models`
 
 ### 联系方式
 
