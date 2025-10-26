@@ -236,8 +236,8 @@ graph TD
 
 ```bash
 # 1. 克隆项目
-git clone https://osredm.com/p41569230/sensitive-detector-v1.git
-cd sensitive-detector-v1
+git clone https://github.com/martingoodmorning/sensitive-detector-v1.0.0.git
+cd sensitive-detector-v1.0.0
 
 # 2. 一键启动（首次启动会自动下载模型，请耐心等待）
 docker-compose up
@@ -680,8 +680,8 @@ ollama pull qwen2.5:7b-instruct-q4_K_M
 **一键部署**:
 ```bash
 # 1. 克隆项目
-git clone https://osredm.com/p41569230/sensitive-detector-v1.git
-cd sensitive-detector-v1
+git clone https://github.com/martingoodmorning/sensitive-detector-v1.0.0.git
+cd sensitive-detector-v1.0.0
 
 # 2. 一键启动（首次启动会自动下载模型，请耐心等待）
 docker-compose up
