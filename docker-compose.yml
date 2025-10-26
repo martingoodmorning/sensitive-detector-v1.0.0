@@ -71,5 +71,5 @@ services:
 # 定义 volumes
 volumes:
   ollama_data:
-    external: true
-    name: sensitive-detector_ollama_data
+  #  external: true
+    name: ollama_models

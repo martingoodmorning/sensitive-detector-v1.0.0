@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr-eng \
     libtesseract-dev \
     curl \
+    jq \
     && rm -rf /var/lib/apt/lists/*
 
 # 配置 Python 国内源
