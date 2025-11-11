@@ -18,6 +18,8 @@ from datetime import datetime
 import time
 import subprocess  # 用于调用antiword工具
 import tempfile  # 用于创建临时文件
+import asyncio
+import asyncio
 
 # 1. 初始化FastAPI应用
 app = FastAPI(title="敏感词检测", version="1.0", docs_url="/api/docs", redoc_url="/api/redoc")
@@ -347,6 +349,8 @@ class ACAutomaton:
 class DFAFilter:
     def __init__(self, words):
         self.words = words
+        # 记录接受状态对应的词，用于可选的边界/容噪判断
+        self.accepting_state_to_word = {}
         self.dfa = self.build_dfa()
 
     def build_dfa(self):
@@ -363,24 +367,54 @@ class DFAFilter:
                 current_state = dfa[(current_state, char)]
             # 标记终态
             dfa[(current_state, '')] = -1  # -1表示终态
+            self.accepting_state_to_word[current_state] = word
         
         return dfa
-
-    def precise_match(self, text, suspicious_segments):
+    
+    def _is_cjk(self, ch: str) -> bool:
+        return '\u4e00' <= ch <= '\u9fff'
+    
+    def _is_noise_ascii(self, ch: str) -> bool:
+        # 作为中文间隙的“噪声”字符：ASCII 的字母数字（不含下划线）
+        # 提示：容噪仅在中文词内部生效，用于提升插字规避样例的召回
+        return bool(ch) and (ch.isalnum()) and not self._is_cjk(ch)
+    
+    def precise_match(self, text, suspicious_segments, noise_tolerant: bool = False):
         """对可疑文本片段进行DFA精准匹配"""
         precise_results = []
         
         for segment in suspicious_segments:
             for i in range(len(segment)):
                 current_state = 0
-                for j in range(i, len(segment)):
+                total_skips = 0
+                j = i
+                while j < len(segment):
                     char = segment[j]
                     if (current_state, char) in self.dfa:
                         current_state = self.dfa[(current_state, char)]
                         if (current_state, '') in self.dfa:  # 到达终态
                             precise_results.append(segment[i:j+1])
-                    else:
-                        break
+                        j += 1
+                        continue
+                    
+                    # 可选：容噪匹配（中文词内部允许跳过少量 ASCII 字母/数字）
+                    if noise_tolerant:
+                        # 经调优参数：单次连续最多跳过 10 个，整段累计最多跳过 100 个
+                        # 旨在处理“敏q感q词”等插字规避情形
+                        MAX_GAP_SKIPS = 10   # 单次间隙最多跳过
+                        MAX_TOTAL_SKIPS = 100 # 整段最多跳过
+                        if total_skips < MAX_TOTAL_SKIPS and self._is_noise_ascii(char):
+                            gap = 0
+                            # 跳过连续的少量ASCII噪声
+                            while j < len(segment) and self._is_noise_ascii(segment[j]) and gap < MAX_GAP_SKIPS and total_skips < MAX_TOTAL_SKIPS:
+                                j += 1
+                                gap += 1
+                                total_skips += 1
+                            # 跳过后不改变 current_state，继续用新的 j 位置匹配
+                            continue
+                    
+                    # 既不是可跳过的噪声，也没有有效转移，则终止该起点
+                    break
         
         return list(set(precise_results))
 
@@ -410,7 +444,7 @@ class TextPreprocessor:
             '＋': '+', '＝': '=', '｜': '|', '＼': '\\', '／': '/', '　': ' '
         }
         
-        # 繁体转简体映射（常用字）
+        # 繁体转简体映射（常用字，后续可根据需要扩展）
         self.traditional_to_simplified = {
             '學': '学', '習': '习', '經': '经', '濟': '济', '發': '发', '現': '现', '實': '实',
             '際': '际', '電': '电', '腦': '脑', '網': '网', '絡': '络', '資': '资', '訊': '讯',
@@ -532,7 +566,17 @@ class ThreeStepFilter:
             self.dfa_filter = DFAFilter(self.words)
 
     def detect(self, text):
-        """规则匹配检测（预处理+AC+DFA）"""
+        """规则匹配检测（预处理 + AC 初筛 + 条件化 DFA）
+        
+        - 预处理：对输入文本进行字符归一化（全角转半角、繁转简、去除特殊符号），供 AC 使用
+        - AC 初筛（归一化文本）：多模式匹配，快速获得 ac_results 与可疑片段 suspicious_segments
+        - 性能优先策略：
+          - 若 AC 已命中：跳过 DFA（dfa_results=[]，dfa_time=0）
+          - 若 AC 未命中：对“原始文本”启用容噪 DFA 复核，提升插字扰动场景的召回
+            - 容噪规则：仅在中文词内部允许跳过 ASCII 字母/数字（不含下划线）
+            - 默认阈值：单次连续最多跳过 10，整段累计最多跳过 100
+        - 最终结果：合并 AC 与（可选）DFA 的命中并去重
+        """
         start_time = time.time()
         
         # 文本预处理：归一化字符格式
@@ -545,10 +589,16 @@ class ThreeStepFilter:
         ac_results, suspicious_segments = self.ac_automaton.search(normalized_text)
         ac_time = time.time() - ac_start
         
-        # 第二步：DFA检测（对原始文本的可疑片段）
-        dfa_start = time.time()
-        dfa_results = self.dfa_filter.precise_match(text, suspicious_segments)
-        dfa_time = time.time() - dfa_start
+        # 第二步：DFA检测
+        # 若 AC 未命中：启用“容噪”DFA对全文作为单一片段进行复核，提升对插字躲避的召回
+        if ac_results:
+            # 性能优先：AC 已命中则跳过 DFA 严格校验
+            dfa_results = []
+            dfa_time = 0
+        else:
+            dfa_start = time.time()
+            dfa_results = self.dfa_filter.precise_match(text, [text], noise_tolerant=True)
+            dfa_time = time.time() - dfa_start
         
         # 合并所有结果
         all_results = list(set(ac_results + dfa_results))
@@ -586,16 +636,15 @@ def call_ollama_api(text: str) -> str:
     call_start_time = time.time()
     model_warm_up_status["last_call_time"] = call_start_time
     
-    # 检查是否是冷启动
+    # 检查是否可能冷启动：仅记录日志，不在请求路径中触发预热
     if not model_warm_up_status["is_warmed_up"]:
         print("检测到模型冷启动，可能需要较长时间...")
     elif model_warm_up_status["warm_up_time"]:
         time_since_warmup = call_start_time - model_warm_up_status["warm_up_time"]
-        if time_since_warmup > 300:  # 5分钟后认为可能冷启动
+        if time_since_warmup > 180:  # 3分钟后认为可能冷启动
             print(f"距离预热已过{time_since_warmup:.0f}秒，可能触发冷启动...")
     
-    # Ollama API 地址与模型名通过环境变量配置
-    # 在WSL环境中，使用host.docker.internal可能无法解析，尝试多种方式
+    # Ollama API 地址与模型名通过环境变量配置，若无环境变量，则使用默认值
     base_url = os.getenv("OLLAMA_BASE_URL", "http://172.17.0.1:11434").rstrip("/")
     model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct-q4_K_M")
     ollama_url = f"{base_url}/api/generate"
@@ -667,6 +716,22 @@ def call_ollama_api(text: str) -> str:
         print(f"异常类型: {type(e).__name__}")
         return "正常"
 
+def _ollama_generate_once(tag: str, prompt: str) -> None:
+    """底层一次性生成调用，用于预热，避免递归进入 call_ollama_api。"""
+    base_url = os.getenv("OLLAMA_BASE_URL", "http://172.17.0.1:11434").rstrip("/")
+    model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct-q4_K_M")
+    url = f"{base_url}/api/generate"
+    payload = {
+        "model": model_name,
+        "prompt": prompt,
+        "stream": False,
+        "temperature": 0
+    }
+    print(f"[{tag}] 直接调用 Ollama 进行一次性预热")
+    resp = requests.post(url, headers={"Content-Type": "application/json"}, data=json.dumps(payload), timeout=30)
+    resp.raise_for_status()
+    _ = resp.json()
+
 def warm_up_model():
     """预热Ollama模型，避免第一次调用时的冷启动延迟"""
     try:
@@ -676,8 +741,8 @@ def warm_up_model():
         warm_up_text = "这是一个测试文本，用于预热模型。"
         
         print("预热中...")
-        result = call_ollama_api(warm_up_text)
-        print(f"预热完成，结果: {result}")
+        _ollama_generate_once("warmup", warm_up_text)
+        print("预热完成")
         
         print("模型预热完成！")
         
@@ -695,9 +760,6 @@ def warm_up_model():
 def initialize_detection_filter():
     """初始化检测过滤器"""
     used_libraries = detection_lib_manager.get_used_libraries()
-    
-    # 预热Ollama模型
-    warm_up_model()
     
     if used_libraries:
         print(f"加载保存的检测词库配置: {', '.join(used_libraries)}")
@@ -743,6 +805,28 @@ three_step_filter = initialize_detection_filter()
 
 # ---------------------- 新增：Ollama API 调用逻辑 ----------------------
 
+
+# ---------------------- 应用级空闲检测：上次调用满3分钟则预热 ----------------------
+@app.on_event("startup")
+async def schedule_idle_warmup():
+    """后台轮询：每60秒检查一次，若距离上次请求>=3分钟，则触发一次预热。"""
+    async def _idle_worker():
+        while True:
+            try:
+                now = time.time()
+                last_call = model_warm_up_status.get("last_call_time")
+                last_warm = model_warm_up_status.get("warm_up_time")
+                if last_call and (now - last_call) >= 180:
+                    if (not last_warm) or ((now - last_warm) >= 180):
+                        loop = asyncio.get_running_loop()
+                        await loop.run_in_executor(None, warm_up_model)
+            except Exception as e:
+                print(f"空闲预热异常: {e}")
+            finally:
+                await asyncio.sleep(60)
+    asyncio.create_task(_idle_worker())
+
+ 
 
 # ---------------------- 定义请求参数格式 ----------------------
 class TextRequest(BaseModel):
@@ -916,7 +1000,7 @@ async def detect_text(req: TextRequest):
         llm_start = time.time()
         llm_result = call_ollama_api(req.text)
         llm_time = time.time() - llm_start
-        # 容错：若模型输出异常，默认按"正常"处理
+        # 容错：仅允许“敏感”或“正常”
         llm_result = llm_result if llm_result in ["敏感", "正常"] else "正常"
         final_result = llm_result
         
@@ -953,7 +1037,7 @@ async def detect_text(req: TextRequest):
         llm_start = time.time()
         llm_result = call_ollama_api(req.text)
         llm_time = time.time() - llm_start
-        # 容错：若模型输出异常，默认按"正常"处理
+        # 容错：仅允许“敏感”或“正常”
         llm_result = llm_result if llm_result in ["敏感", "正常"] else "正常"
         final_result = llm_result  # 大模型检测结果即为最终结果
     else:
@@ -1000,7 +1084,7 @@ async def get_model_status():
     if model_warm_up_status["warm_up_time"]:
         time_since_warmup = current_time - model_warm_up_status["warm_up_time"]
         status_info["time_since_warmup"] = round(time_since_warmup, 2)
-        status_info["warmup_status"] = "active" if time_since_warmup < 300 else "stale"
+        status_info["warmup_status"] = "active" if time_since_warmup < 180 else "stale"
     else:
         status_info["time_since_warmup"] = None
         status_info["warmup_status"] = "not_warmed"
