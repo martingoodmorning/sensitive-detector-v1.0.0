@@ -703,6 +703,7 @@ def call_ollama_api(text: str) -> str:
     
     print(f"尝试调用Ollama API: {ollama_url}")
     print(f"使用模型: {model_name}")
+    keep_alive_value = os.getenv("OLLAMA_KEEP_ALIVE_REQUEST", "15m")
     
     # 提示词工程：严格约束输出，确保一致性
     prompt = f"""
@@ -745,7 +746,8 @@ def call_ollama_api(text: str) -> str:
                 "model": model_name,
                 "prompt": prompt,
                 "stream": False,
-                "temperature": 0
+                "temperature": 0,
+                "keep_alive": keep_alive_value
             },
             timeout=60
         )
@@ -773,39 +775,50 @@ def _ollama_generate_once(tag: str, prompt: str) -> None:
     base_url = get_ollama_base_url()
     model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct-q4_K_M")
     url = f"{base_url}/api/generate"
+    keep_alive_value = os.getenv("OLLAMA_KEEP_ALIVE_REQUEST", "15m")
     payload = {
         "model": model_name,
         "prompt": prompt,
         "stream": False,
-        "temperature": 0
+        "temperature": 0,
+        "keep_alive": keep_alive_value
     }
-    print(f"[{tag}] 直接调用 Ollama 进行一次性预热")
+    print(f"[{tag}] 直接调用 Ollama 进行一次性预热: url={url}, model={model_name}, keep_alive={keep_alive_value}")
+    start_ts = time.time()
     resp = requests.post(url, headers={"Content-Type": "application/json"}, data=json.dumps(payload), timeout=60)
+    elapsed = time.time() - start_ts
+    print(f"[{tag}] API响应状态码: {resp.status_code}，耗时: {elapsed:.2f}s")
     resp.raise_for_status()
-    _ = resp.json()
+    try:
+        data = resp.json()
+        snippet = str(data.get("response", ""))
+        if len(snippet) > 120:
+            snippet = snippet[:120] + "..."
+        print(f"[{tag}] API响应片段: '{snippet}'")
+    except Exception as e:
+        print(f"[{tag}] 解析响应JSON失败: {type(e).__name__}: {e}")
 
 def warm_up_model():
-    """预热Ollama模型，避免第一次调用时的冷启动延迟"""
+    """预热Ollama模型：直接执行一次与主流程一致的敏感词检测测试。"""
     try:
-        print("正在预热Ollama模型...")
-        
-        # 单次预热，快速启动模型
-        warm_up_text = "这是一个测试文本，用于预热模型。"
-        
-        print("预热中...")
-        _ollama_generate_once("warmup", warm_up_text)
-        print("预热完成")
+        print("正在预热Ollama模型（完整测试）...")
+        # 使用贴近真实检测链路的测试文本，触发完整提示词与判定逻辑
+        warm_up_text = "这是一个用于预热的测试文本，不包含侮辱、暴力、违法、色情等敏感内容。请判断是否为敏感。"
+        print("预热中（执行一次完整敏感词判定）...")
+        start = time.time()
+        result = call_ollama_api(warm_up_text)
+        elapsed = (time.time() - start) * 1000
+        print(f"预热检测结果: {result}，耗时: {elapsed:.2f}ms")
         
         print("模型预热完成！")
-        
         # 更新预热状态
         model_warm_up_status["is_warmed_up"] = True
         model_warm_up_status["warm_up_time"] = time.time()
         
-        return True
+        return {"ok": True, "result": result, "elapsed_ms": round(elapsed, 2)}
     except Exception as e:
         print(f"模型预热失败: {e}")
-        return False
+        return {"ok": False, "error": str(e)}
 
 
 # 启动时加载保存的检测词库配置
@@ -1160,24 +1173,25 @@ async def get_model_status():
 
 @app.post("/warm-up-model", summary="预热Ollama模型")
 async def warm_up_model_endpoint():
-    """预热Ollama模型，减少第一次调用的延迟"""
+    """预热Ollama模型，执行一次完整的敏感词检测测试以减少首次调用延迟"""
     try:
-        success = warm_up_model()
-        if success:
+        info = warm_up_model()
+        if isinstance(info, dict) and info.get("ok"):
             return {
                 "status": "success",
-                "message": "模型预热成功"
+                "message": "模型预热成功",
+                "data": {"result": info.get("result"), "elapsed_ms": info.get("elapsed_ms")}
             }
         else:
             return {
                 "status": "error", 
-                "message": "模型预热失败"
+                "message": f"模型预热失败: {info.get('error') if isinstance(info, dict) else 'unknown'}"
             }
     except Exception as e:
         return {
             "status": "error",
             "message": f"模型预热异常: {str(e)}"
-    }
+        }
 
 # ---------------------- 核心API：文档检测 ----------------------
 @app.post("/detect/document", summary="文档敏感词检测（支持txt/pdf/docx/doc/图片OCR，严格模式）")
