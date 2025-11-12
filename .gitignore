@@ -6,8 +6,7 @@ ollama_backup.tar.gz
 # 模型文件
 data/ollama/
 #策划书和演示视频
-“净语”智能敏感词检测系统策划书.pdf
-demo\demo.mp4
+
 # Python 缓存文件
 __pycache__/
 *.py[cod]

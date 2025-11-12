@@ -261,6 +261,58 @@ model_warm_up_status = {
 }
 
 
+# ---------------------- Ollama 地址解析与缓存 ----------------------
+# 说明：为适配不同部署环境（Docker 内、宿主机、本机直跑），在运行时动态解析并缓存可用的
+# Ollama 基础地址，避免因网络拓扑差异导致的连接失败。
+_OLLAMA_RESOLVED_BASE_URL: Optional[str] = None
+
+def _build_ollama_candidates() -> List[str]:
+    """按优先级构建候选 Ollama 基础地址列表，并去重。"""
+    env_url = os.getenv("OLLAMA_BASE_URL")
+    candidates = []
+    if env_url:
+        candidates.append(env_url.rstrip("/"))
+    # 与 start.sh 对齐的回退顺序
+    candidates.extend([
+        "http://ollama:11434",
+        "http://host.docker.internal:11434",
+        "http://172.17.0.1:11434",
+        "http://localhost:11434",
+    ])
+    # 去重保序
+    seen = set()
+    ordered = []
+    for url in candidates:
+        u = url.rstrip("/")
+        if u and u not in seen:
+            ordered.append(u)
+            seen.add(u)
+    return ordered
+
+def resolve_ollama_base_url(timeout: float = 2.0) -> str:
+    """探测候选地址并缓存首个可用地址；若均不可用则回退到首个候选。"""
+    global _OLLAMA_RESOLVED_BASE_URL
+    candidates = _build_ollama_candidates()
+    for url in candidates:
+        probe = f"{url}/api/tags"
+        try:
+            resp = requests.get(probe, timeout=timeout)
+            if resp.ok:
+                _OLLAMA_RESOLVED_BASE_URL = url
+                print(f"已解析Ollama地址: {url}")
+                return url
+        except Exception as e:
+            print(f"Ollama地址探测失败: {url} -> {type(e).__name__}: {e}")
+    fallback = candidates[0] if candidates else "http://172.17.0.1:11434"
+    print(f"未能确认Ollama可用地址，回退使用: {fallback}")
+    _OLLAMA_RESOLVED_BASE_URL = fallback
+    return fallback
+
+def get_ollama_base_url() -> str:
+    """获取已解析或即时解析的 Ollama 基础地址。"""
+    return _OLLAMA_RESOLVED_BASE_URL or resolve_ollama_base_url()
+
+
 # ---------------------- 双重匹配规则引擎 ----------------------
 
 # 第一步：AC自动机初筛 - 快速过滤无风险文本，标记可疑文本
@@ -644,8 +696,8 @@ def call_ollama_api(text: str) -> str:
         if time_since_warmup > 180:  # 3分钟后认为可能冷启动
             print(f"距离预热已过{time_since_warmup:.0f}秒，可能触发冷启动...")
     
-    # Ollama API 地址与模型名通过环境变量配置，若无环境变量，则使用默认值
-    base_url = os.getenv("OLLAMA_BASE_URL", "http://172.17.0.1:11434").rstrip("/")
+    # 解析 Ollama 基础地址与模型名（带多地址回退与缓存）
+    base_url = get_ollama_base_url()
     model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct-q4_K_M")
     ollama_url = f"{base_url}/api/generate"
     
@@ -695,7 +747,7 @@ def call_ollama_api(text: str) -> str:
                 "stream": False,
                 "temperature": 0
             },
-            timeout=30
+            timeout=60
         )
         print(f"API响应状态码: {response.status_code}")
         response.raise_for_status()  # 若 HTTP 状态码异常，抛出错误
@@ -718,7 +770,7 @@ def call_ollama_api(text: str) -> str:
 
 def _ollama_generate_once(tag: str, prompt: str) -> None:
     """底层一次性生成调用，用于预热，避免递归进入 call_ollama_api。"""
-    base_url = os.getenv("OLLAMA_BASE_URL", "http://172.17.0.1:11434").rstrip("/")
+    base_url = get_ollama_base_url()
     model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:7b-instruct-q4_K_M")
     url = f"{base_url}/api/generate"
     payload = {
@@ -728,7 +780,7 @@ def _ollama_generate_once(tag: str, prompt: str) -> None:
         "temperature": 0
     }
     print(f"[{tag}] 直接调用 Ollama 进行一次性预热")
-    resp = requests.post(url, headers={"Content-Type": "application/json"}, data=json.dumps(payload), timeout=30)
+    resp = requests.post(url, headers={"Content-Type": "application/json"}, data=json.dumps(payload), timeout=60)
     resp.raise_for_status()
     _ = resp.json()
 
@@ -810,6 +862,15 @@ three_step_filter = initialize_detection_filter()
 @app.on_event("startup")
 async def schedule_idle_warmup():
     """后台轮询：每60秒检查一次，若距离上次请求>=3分钟，则触发一次预热。"""
+    async def _initial_warmup():
+        """应用启动后一小段时间即进行一次轻量预热，不阻塞启动。"""
+        try:
+            # 先解析可用的 Ollama 地址，减少首次调用失败概率
+            resolve_ollama_base_url()
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, warm_up_model)
+        except Exception as e:
+            print(f"启动预热异常: {e}")
     async def _idle_worker():
         while True:
             try:
@@ -824,6 +885,9 @@ async def schedule_idle_warmup():
                 print(f"空闲预热异常: {e}")
             finally:
                 await asyncio.sleep(60)
+    # 启动即进行一次轻量预热（异步）
+    asyncio.create_task(_initial_warmup())
+    # 后台轮询空闲预热
     asyncio.create_task(_idle_worker())
 
  
